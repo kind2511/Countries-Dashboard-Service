@@ -16,8 +16,6 @@ import (
 var ctx context.Context
 var client *firestore.Client
 
-// name of collection used for dashboard
-//const collection = "Dashboard"
 
 
 func main() {
