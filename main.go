@@ -26,4 +26,8 @@ func main() {
 	http.HandleFunc(utils.DASHBOARD_PATH, handler.DashboardHandler)
 	http.HandleFunc(utils.STATUS_PATH, handler.StatusHandler)
 
+	//Starts and listens to the port
+	log.Println("Starting server on port " + port + " ...")
+	log.Fatal(http.ListenAndServe(":"+port, nil))
+
 }

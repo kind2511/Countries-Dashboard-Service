@@ -1,0 +1,33 @@
+[
+    {
+       "id": 1,
+       "country": "Norway",
+       "isoCode": "NO",
+       "features": {
+                      "temperature": true,
+                      "precipitation": true,
+                      "capital": true,
+                      "coordinates": true,
+                      "population": true,
+                      "area": true,
+                      "targetCurrencies": ["EUR", "USD", "SEK"]
+                   }, 
+       "lastChange": "20240229 14:07"
+    },
+    {
+       "id": 2,
+       "country": "Denmark",
+       "isoCode": "DK",
+       "features": {
+                      "temperature": true,
+                      "precipitation": true,
+                      "capital": true,
+                      "coordinates": true,
+                      "population": true,
+                      "area": true,
+                      "targetCurrencies": ["NOK", "MYR", "JPY", "EUR"]
+                   },
+        "lastChange": "20240224 08:27"
+    }
+ ]
+ 
