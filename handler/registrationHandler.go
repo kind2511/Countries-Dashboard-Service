@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+
 	"cloud.google.com/go/firestore"
 	"google.golang.org/api/iterator"
 )
@@ -33,6 +34,8 @@ func RegistrationHandler(w http.ResponseWriter, r *http.Request) {
 		postRegistration(w, r)
 	case http.MethodGet:
 		getDashboards(w, r)
+    case http.MethodDelete:
+        deleteDashboard(w, r)
 	default:
 		log.Println("Unsupported request method" + r.Method)
 		http.Error(w, "Unsupported request method"+r.Method, http.StatusMethodNotAllowed)
@@ -147,5 +150,27 @@ func getDashboards(w http.ResponseWriter, r *http.Request) {
 
 // Deletes a specific dashboard based on its Firestore ID
 func deleteDashboard(w http.ResponseWriter, r *http.Request) {
+    // Extract dashboard ID from URL
+    elem := strings.Split(r.URL.Path, "/")
+    dashboardID := elem[4]
 
+    if len(dashboardID) != 0 {
+        // Get reference to the document
+        docRef := client.Collection(collection).Doc(dashboardID)
+
+        // Delete the document
+        _, err := docRef.Delete(ctx)
+        if err != nil {
+            log.Println("Error deleting document:", err)
+            http.Error(w, "Error deleting document", http.StatusInternalServerError)
+            return
+        }
+
+        // Return success message
+        w.WriteHeader(http.StatusNoContent)
+    } else {
+        // If Dashboard ID is not provided
+        http.Error(w, "Dashboard ID not provided", http.StatusBadRequest)
+        return
+    }
 }
