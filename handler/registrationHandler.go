@@ -61,6 +61,7 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 
 }
 
+// Gets one dashboard based on its Firestore ID. If no ID is provided it gets all dashboards
 func getDashboards(w http.ResponseWriter, r *http.Request) {
     // Test for embedded dashboard ID from URL
     elem := strings.Split(r.URL.Path, "/")
@@ -142,4 +143,9 @@ func getDashboards(w http.ResponseWriter, r *http.Request) {
             }
         }
     }
+}
+
+// Deletes a specific dashboard based on its Firestore ID
+func deleteDashboard(w http.ResponseWriter, r *http.Request) {
+
 }
