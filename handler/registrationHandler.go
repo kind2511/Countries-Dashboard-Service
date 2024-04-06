@@ -1,9 +1,25 @@
 package handler
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
+	"strings"
+	"cloud.google.com/go/firestore"
+	"google.golang.org/api/iterator"
 )
+
+// Firebase context and client used by Firestore functions throughout the program.
+var ctx context.Context
+var client *firestore.Client
+
+// sets the firestore client
+func SetFirestoreClient(c context.Context, cli *firestore.Client) {
+    ctx = c
+    client = cli
+}
 
 // name of collection used for dashboards
 const collection = "Dashboard"
@@ -16,7 +32,7 @@ func RegistrationHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		postRegistration(w, r)
 	case http.MethodGet:
-		getSpecificDashboardConfiguration(w, r)
+		getDashboards(w, r)
 	default:
 		log.Println("Unsupported request method" + r.Method)
 		http.Error(w, "Unsupported request method"+r.Method, http.StatusMethodNotAllowed)
@@ -45,7 +61,85 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func getSpecificDashboardConfiguration(w http.ResponseWriter, r *http.Request) {
-	
-}
+func getDashboards(w http.ResponseWriter, r *http.Request) {
+    // Test for embedded dashboard ID from URL
+    elem := strings.Split(r.URL.Path, "/")
+    dashboardId := elem[4]
 
+    if len(dashboardId) != 0 {
+        // Retrieve specific document based on ID
+        res := client.Collection(collection).Doc(dashboardId)
+
+        // Retrieve reference to document
+        doc, err := res.Get(ctx)
+        if err != nil {
+            log.Println("Error retrieving document:", err)
+            http.Error(w, "Error retrieving document", http.StatusInternalServerError)
+            return
+        }
+
+        // Get the entire document data
+        docData := doc.Data()
+
+        // Add the document ID to the data
+        docData["id"] = doc.Ref.ID
+
+        // Marshal the entire document data to JSON
+        jsonData, err := json.Marshal(docData)
+        if err != nil {
+            log.Println("Error marshaling JSON:", err)
+            http.Error(w, "Error marshaling JSON", http.StatusInternalServerError)
+            return
+        }
+
+        // Set the Content-Type header to application/json
+        w.Header().Set("Content-Type", "application/json")
+
+        // Write the JSON data to the response
+        _, err = w.Write(jsonData)
+        if err != nil {
+            log.Println("Error writing JSON response:", err)
+            http.Error(w, "Error writing JSON response", http.StatusInternalServerError)
+            return
+        }
+    } else {
+        // Collective retrieval of documents
+        iter := client.Collection(collection).Documents(ctx)
+
+        for {
+            doc, err := iter.Next()
+            if errors.Is(err, iterator.Done) {
+                break
+            }
+            if err != nil {
+                log.Printf("Failed to iterate: %v", err)
+                return
+            }
+
+            // Get the entire document data
+            docData := doc.Data()
+
+            // Add the document ID to the data
+            docData["id"] = doc.Ref.ID
+
+            // Marshal the entire document data to JSON
+            jsonData, err := json.Marshal(docData)
+            if err != nil {
+                log.Println("Error marshaling JSON:", err)
+                http.Error(w, "Error marshaling JSON", http.StatusInternalServerError)
+                return
+            }
+
+            // Set the Content-Type header to application/json
+            w.Header().Set("Content-Type", "application/json")
+
+            // Write the JSON data to the response
+            _, err = w.Write(jsonData)
+            if err != nil {
+                log.Println("Error writing JSON response:", err)
+                http.Error(w, "Error writing JSON response", http.StatusInternalServerError)
+                return
+            }
+        }
+    }
+}
