@@ -30,10 +30,10 @@ Handler for all registration-related operations
 */
 func RegistrationHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
-	case http.MethodPost:
-		postRegistration(w, r)
-	case http.MethodGet:
-		getDashboards(w, r)
+    case http.MethodPost:
+        postRegistration(w, r)
+    case http.MethodGet:
+        getDashboards(w, r)
     case http.MethodDelete:
         deleteDashboard(w, r)
 	default:
@@ -129,7 +129,7 @@ func getDashboards(w http.ResponseWriter, r *http.Request) {
                 return
             }
 
-            // Call common function to retrieve document data and write JSON response
+            // Retrieves document and writes JSON response
             retrieveDocumentData(w, doc)
         }
     }
