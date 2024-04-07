@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"assignment2/utils"
 	"context"
 	"encoding/json"
 	"errors"
@@ -66,73 +67,86 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 
 // Function to retrieve document data and write JSON response
 func retrieveDocumentData(w http.ResponseWriter, doc *firestore.DocumentSnapshot) {
-    // Get the entire document data
-    docData := doc.Data()
+	// Get the document ID
+	docID := doc.Ref.ID
 
-    // Add the document ID to the data
-    docData["id"] = doc.Ref.ID
+	// Map document data to Firestore struct
+	var originalDoc utils.Firestore
+	if err := doc.DataTo(&originalDoc); err != nil {
+		log.Println("Error retrieving document data:", err)
+		http.Error(w, "Error retrieving document data", http.StatusInternalServerError)
+		return
+	}
 
-    // Marshal the entire document data to JSON
-    jsonData, err := json.Marshal(docData)
-    if err != nil {
-        log.Println("Error marshaling JSON:", err)
-        http.Error(w, "Error marshaling JSON", http.StatusInternalServerError)
-        return
-    }
+	// Create a Registration struct to create desired structure
+	desiredDoc := utils.Registration{
+		ID:         docID,
+		Country:    originalDoc.Country,
+		IsoCode:    originalDoc.IsoCode,
+		Features:   originalDoc.Features,
+		LastChange: originalDoc.LastChange.Format("20060102 15:04"), // Format timestamp
+	}
 
-    // Set the Content-Type header to application/json
-    w.Header().Set("Content-Type", "application/json")
+	// Marshal the desired document to JSON
+	jsonData, err := json.Marshal(desiredDoc)
+	if err != nil {
+		log.Println("Error marshaling JSON:", err)
+		http.Error(w, "Error marshaling JSON", http.StatusInternalServerError)
+		return
+	}
 
-    // Set the status code to 200
-    w.WriteHeader(http.StatusOK)
+	// Set the Content-Type header to application/json
+	w.Header().Set("Content-Type", "application/json")
 
-    // Write the JSON data to the response
-    _, err = w.Write(jsonData)
-    if err != nil {
-        log.Println("Error writing JSON response:", err)
-        http.Error(w, "Error writing JSON response", http.StatusInternalServerError)
-        return
-    }
+	// Set the status code to 200
+	w.WriteHeader(http.StatusOK)
+
+	// Write the JSON data to the response
+	if _, err := w.Write(jsonData); err != nil {
+		log.Println("Error writing JSON response:", err)
+		http.Error(w, "Error writing JSON response", http.StatusInternalServerError)
+		return
+	}
 }
 
 // Gets one dashboard based on its Firestore ID. If no ID is provided it gets all dashboards
 func getDashboards(w http.ResponseWriter, r *http.Request) {
-    // Looks fro dashboard ID
-    elem := strings.Split(r.URL.Path, "/")
-    dashboardId := elem[4]
+	// Looks for dashboard ID
+	elem := strings.Split(r.URL.Path, "/")
+	dashboardID := elem[4]
 
-    if len(dashboardId) != 0 {
-        // Retrieve specific document based on ID
-        res := client.Collection(collection).Doc(dashboardId)
+	if len(dashboardID) != 0 {
+		// Retrieve specific document based on ID
+		res := client.Collection(collection).Doc(dashboardID)
 
-        // Retrieve reference to document
-        doc, err := res.Get(ctx)
-        if err != nil {
-            log.Println("Error retrieving document:", err)
-            http.Error(w, "Error retrieving document", http.StatusInternalServerError)
-            return
-        }
+		// Retrieve reference to document
+		doc, err := res.Get(ctx)
+		if err != nil {
+			log.Println("Error retrieving document:", err)
+			http.Error(w, "Error retrieving document", http.StatusInternalServerError)
+			return
+		}
 
-        // Retrieves document and writes JSON response
-        retrieveDocumentData(w, doc)
-    } else {
-        // Collective retrieval of documents
-        iter := client.Collection(collection).Documents(ctx)
+		// Retrieves document and writes JSON response
+		retrieveDocumentData(w, doc)
+	} else {
+		// Collective retrieval of documents
+		iter := client.Collection(collection).Documents(ctx)
 
-        for {
-            doc, err := iter.Next()
-            if errors.Is(err, iterator.Done) {
-                break
-            }
-            if err != nil {
-                log.Printf("Failed to iterate: %v", err)
-                return
-            }
+		for {
+			doc, err := iter.Next()
+			if errors.Is(err, iterator.Done) {
+				break
+			}
+			if err != nil {
+				log.Printf("Failed to iterate: %v", err)
+				return
+			}
 
-            // Retrieves document and writes JSON response
-            retrieveDocumentData(w, doc)
-        }
-    }
+			// Retrieves document and writes JSON response
+			retrieveDocumentData(w, doc)
+		}
+	}
 }
 
 // Deletes a specific dashboard based on its Firestore ID
