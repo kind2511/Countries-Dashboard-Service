@@ -64,9 +64,40 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 
 }
 
+// Function to retrieve document data and write JSON response
+func retrieveDocumentData(w http.ResponseWriter, doc *firestore.DocumentSnapshot) {
+    // Get the entire document data
+    docData := doc.Data()
+
+    // Add the document ID to the data
+    docData["id"] = doc.Ref.ID
+
+    // Marshal the entire document data to JSON
+    jsonData, err := json.Marshal(docData)
+    if err != nil {
+        log.Println("Error marshaling JSON:", err)
+        http.Error(w, "Error marshaling JSON", http.StatusInternalServerError)
+        return
+    }
+
+    // Set the Content-Type header to application/json
+    w.Header().Set("Content-Type", "application/json")
+
+    // Set the status code to 200
+    w.WriteHeader(http.StatusOK)
+
+    // Write the JSON data to the response
+    _, err = w.Write(jsonData)
+    if err != nil {
+        log.Println("Error writing JSON response:", err)
+        http.Error(w, "Error writing JSON response", http.StatusInternalServerError)
+        return
+    }
+}
+
 // Gets one dashboard based on its Firestore ID. If no ID is provided it gets all dashboards
 func getDashboards(w http.ResponseWriter, r *http.Request) {
-    // Test for embedded dashboard ID from URL
+    // Looks fro dashboard ID
     elem := strings.Split(r.URL.Path, "/")
     dashboardId := elem[4]
 
@@ -82,30 +113,8 @@ func getDashboards(w http.ResponseWriter, r *http.Request) {
             return
         }
 
-        // Get the entire document data
-        docData := doc.Data()
-
-        // Add the document ID to the data
-        docData["id"] = doc.Ref.ID
-
-        // Marshal the entire document data to JSON
-        jsonData, err := json.Marshal(docData)
-        if err != nil {
-            log.Println("Error marshaling JSON:", err)
-            http.Error(w, "Error marshaling JSON", http.StatusInternalServerError)
-            return
-        }
-
-        // Set the Content-Type header to application/json
-        w.Header().Set("Content-Type", "application/json")
-
-        // Write the JSON data to the response
-        _, err = w.Write(jsonData)
-        if err != nil {
-            log.Println("Error writing JSON response:", err)
-            http.Error(w, "Error writing JSON response", http.StatusInternalServerError)
-            return
-        }
+        // Retrieves document and writes JSON response
+        retrieveDocumentData(w, doc)
     } else {
         // Collective retrieval of documents
         iter := client.Collection(collection).Documents(ctx)
@@ -120,30 +129,8 @@ func getDashboards(w http.ResponseWriter, r *http.Request) {
                 return
             }
 
-            // Get the entire document data
-            docData := doc.Data()
-
-            // Add the document ID to the data
-            docData["id"] = doc.Ref.ID
-
-            // Marshal the entire document data to JSON
-            jsonData, err := json.Marshal(docData)
-            if err != nil {
-                log.Println("Error marshaling JSON:", err)
-                http.Error(w, "Error marshaling JSON", http.StatusInternalServerError)
-                return
-            }
-
-            // Set the Content-Type header to application/json
-            w.Header().Set("Content-Type", "application/json")
-
-            // Write the JSON data to the response
-            _, err = w.Write(jsonData)
-            if err != nil {
-                log.Println("Error writing JSON response:", err)
-                http.Error(w, "Error writing JSON response", http.StatusInternalServerError)
-                return
-            }
+            // Call common function to retrieve document data and write JSON response
+            retrieveDocumentData(w, doc)
         }
     }
 }

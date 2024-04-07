@@ -4,7 +4,7 @@ package utils
 type Registration struct {
 	Country  string   `json:"country"`
 	Isocode  string   `json:"isocode"`
-	Features Features `json:"features"`
+	Features Features `json:"features"` 
 }
 
 // Struct for features
