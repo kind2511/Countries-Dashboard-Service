@@ -325,11 +325,23 @@ func whatTimeNow2() string {
 
 }
 
+// function to get a document based on its id field
+func getDocumentByID(ctx context.Context, collection string, dashboardID string) (*firestore.DocumentSnapshot, error) {
+    // Query documents where the 'id' field matches the provided dashboardID
+    query := client.Collection(collection).Where("id", "==", dashboardID).Limit(1)
+    iter := query.Documents(ctx)
+
+    // Retrieve reference to document
+    doc, err := iter.Next()
+    if err != nil {
+        return nil, err
+    }
+
+    return doc, nil
+}
+
 // Function to retrieve document data and write JSON response
 func retrieveDocumentData(w http.ResponseWriter, doc *firestore.DocumentSnapshot) {
-	// Get the document ID
-	docID := doc.Ref.ID
-
 	// Map document data to Firestore struct
 	var originalDoc utils.Firestore
 	if err := doc.DataTo(&originalDoc); err != nil {
@@ -340,7 +352,7 @@ func retrieveDocumentData(w http.ResponseWriter, doc *firestore.DocumentSnapshot
 
 	// Create a Registration struct to create desired structure
 	desiredDoc := utils.Registration{
-		ID:         docID,
+		ID:         originalDoc.ID,
 		Country:    originalDoc.Country,
 		IsoCode:    originalDoc.IsoCode,
 		Features:   originalDoc.Features,
@@ -371,21 +383,24 @@ func retrieveDocumentData(w http.ResponseWriter, doc *firestore.DocumentSnapshot
 
 // Gets one dashboard based on its Firestore ID. If no ID is provided it gets all dashboards
 func getDashboards(w http.ResponseWriter, r *http.Request) {
-	// Looks for dashboard ID
+	// Extract dashboard ID from URL
 	elem := strings.Split(r.URL.Path, "/")
 	dashboardID := elem[4]
 
 	if len(dashboardID) != 0 {
-		// Retrieve specific document based on ID
-		res := client.Collection(collection).Doc(dashboardID)
-
-		// Retrieve reference to document
-		doc, err := res.Get(ctx)
-		if err != nil {
-			log.Println("Error retrieving document:", err)
-			http.Error(w, "Error retrieving document", http.StatusInternalServerError)
-			return
-		}
+		doc, err := getDocumentByID(ctx, collection, dashboardID)
+        if err != nil {
+            if err == iterator.Done {
+                // Document not found
+                errorMessage := "Document with ID " + dashboardID + " not found"
+                http.Error(w, errorMessage, http.StatusNotFound)
+                return
+            }
+            // If trouble retrieving document
+            log.Println("Error retrieving document:", err)
+            http.Error(w, "Error retrieving document", http.StatusInternalServerError)
+            return
+        }
 
 		// Retrieves document and writes JSON response
 		retrieveDocumentData(w, doc)
@@ -409,18 +424,29 @@ func getDashboards(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Deletes a specific dashboard based on its Firestore ID
+// Deletes a specific dashboard based on its 'id' field
 func deleteDashboard(w http.ResponseWriter, r *http.Request) {
 	// Extract dashboard ID from URL
 	elem := strings.Split(r.URL.Path, "/")
 	dashboardID := elem[4]
 
 	if len(dashboardID) != 0 {
-		// Get reference to the document
-		docRef := client.Collection(collection).Doc(dashboardID)
+		doc, err := getDocumentByID(ctx, collection, dashboardID)
+        if err != nil {
+            if err == iterator.Done {
+                // Document not found
+                errorMessage := "Document with ID " + dashboardID + " not found"
+                http.Error(w, errorMessage, http.StatusNotFound)
+                return
+            }
+            // If trouble retrieving document
+            log.Println("Error retrieving document:", err)
+            http.Error(w, "Error retrieving document", http.StatusInternalServerError)
+            return
+        }
 
 		// Delete the document
-		_, err := docRef.Delete(ctx)
+		_, err = doc.Ref.Delete(ctx)
 		if err != nil {
 			log.Println("Error deleting document:", err)
 			http.Error(w, "Error deleting document", http.StatusInternalServerError)
