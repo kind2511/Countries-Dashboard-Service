@@ -1,12 +1,12 @@
 package utils
 
-import "time"
-
 // Struct for registration
-type Registration struct {
-	Country  string   `json:"country"`
-	Isocode  string   `json:"isocode,omitempty"`
-	Features Features `json:"features"`
+type Dashboard struct {
+	ID         DashboardResponse `json:"id"`
+	Country    string            `json:"country"`
+	Isocode    string            `json:"isocode,omitempty"`
+	Features   Features          `json:"features, omitempty"`
+	LastChange string            `json:"lastChange"`
 }
 
 type Features struct {
@@ -19,9 +19,10 @@ type Features struct {
 	TargetCurrencies []string `json:"targetcurrencies, omitempty"`
 }
 
-type RegResponse struct {
-	ID         string    `json:"id"`
-	LastChange time.Time `json:"lastChange"`
+// Struct for dashboard registration response
+type DashboardResponse struct {
+	ID         string `json:"id"`
+	LastChange string `json:"lastChange"`
 }
 
 // Struct for country API
