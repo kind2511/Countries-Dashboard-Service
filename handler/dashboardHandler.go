@@ -2,11 +2,15 @@ package handler
 
 import (
 	"assignment2/utils"
+	"context"
 	"encoding/json"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
+
+	"cloud.google.com/go/firestore"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // Own float type, either float32 or float64, whatever we see fit
@@ -62,6 +66,16 @@ func DashboardHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+var ctx context.Context
+var client *firestore.Client
+
+const collection = "dashboard"
+
+func SetFirestoreClient(c context.Context, cli *firestore.Client) {
+	ctx = c
+	client = cli
+}
+
 /*
 This function will receive data from json, with the dashboards, check what variables will show values
 
@@ -72,33 +86,21 @@ func DashboardFunc(w http.ResponseWriter, r *http.Request) error {
 	//Finding out what ID is written in the URL path
 	myId := r.URL.Path[len(utils.DASHBOARD_PATH):]
 
-	var inputData []Recieved_Dashboard
-
-	//Fetching data from json file, which contains dashboards
-	err := fetchURLdata("test-data.json", false, w, &inputData)
+	//Goes through collection in firebase, and fetches document with Id.
+	res, err := client.Collection(collection).Doc(myId).Get(context.Background())
 	if err != nil {
-		return err
-	}
 
-	//Checking and converting the id to int, which will be used for fetching object
-	myIdInt, err := strconv.Atoi(myId)
-	if err != nil {
-		http.Error(w, "'"+myId+"'"+" is not a valid id", http.StatusBadRequest)
-		return err
-	}
-	//Small function that returns object based on matching object Id
-	getObjectByID := func(id int) *Recieved_Dashboard {
-		for _, obj := range inputData {
-			if obj.Id == id {
-				return &obj
-			}
+		//If there is no document with specified id
+		if status.Code(err) == codes.NotFound {
+			http.Error(w, "Document with Id: '"+myId+"' does not exist", http.StatusBadRequest)
+			return nil
 		}
-		return nil
+		return err
 	}
-	//Getting object from an id. If nil, error is returned
-	myObject := getObjectByID(myIdInt)
-	if myObject == nil {
-		http.Error(w, "Object with Id "+"'"+myId+"' not found", http.StatusBadRequest)
+
+	//Creates the object using the struct, and sends data to the struct
+	var myObject Recieved_Dashboard
+	if err := res.DataTo(&myObject); err != nil {
 		return err
 	}
 
@@ -194,6 +196,9 @@ func DashboardFunc(w http.ResponseWriter, r *http.Request) error {
 		http.Error(w, "Failed to encode result", http.StatusInternalServerError)
 		return err
 	}
+
+	//Maybe put in something here, if we want to add in something extra
+
 	return nil
 }
 
@@ -201,35 +206,21 @@ func DashboardFunc(w http.ResponseWriter, r *http.Request) error {
 Retrieves data from URL
 */
 
-func fetchURLdata(myData string, isUrl bool, w http.ResponseWriter, data interface{}) error {
+func fetchURLdata(myData string, w http.ResponseWriter, data interface{}) error {
 
 	//If the fetched data is from an API
-	if isUrl {
-		response, err := http.Get(myData)
-		if err != nil {
-			http.Error(w, "Failed to fetch url: "+myData, http.StatusInternalServerError)
-			return err
-		}
-		defer response.Body.Close()
-		err = json.NewDecoder(response.Body).Decode(&data)
-		if err != nil {
-			http.Error(w, "Failed to decode url: "+myData, http.StatusInternalServerError)
-			return err
-		}
-		//If the fetched data is from a JSON file
-	} else {
-		file, err := os.Open(myData)
-		if err != nil {
-			http.Error(w, "Failed to fetch file data: "+myData, http.StatusInternalServerError)
-			return err
-		}
-		defer file.Close()
-		err = json.NewDecoder(file).Decode(&data)
-		if err != nil {
-			http.Error(w, "Failed to decode file data: "+myData, http.StatusInternalServerError)
-			return err
-		}
+	response, err := http.Get(myData)
+	if err != nil {
+		http.Error(w, "Failed to fetch url: "+myData, http.StatusInternalServerError)
+		return err
 	}
+	defer response.Body.Close()
+	err = json.NewDecoder(response.Body).Decode(&data)
+	if err != nil {
+		http.Error(w, "Failed to decode url: "+myData, http.StatusInternalServerError)
+		return err
+	}
+	//If the fetched data is from a JSON file
 	return nil
 
 }
@@ -251,7 +242,7 @@ func retrieveCountryData(country string, w http.ResponseWriter, r *http.Request)
 	var chosenCountry []Country
 
 	//Fetches data from specified country
-	err := fetchURLdata(utils.COUNTRIES_API+"name/"+myCountry, true, w, &chosenCountry)
+	err := fetchURLdata(utils.COUNTRIES_API+"name/"+myCountry, w, &chosenCountry)
 	if err != nil {
 		return 0, "", "", 0, err
 	}
@@ -292,7 +283,7 @@ func retrieveCoordinates(capital string, w http.ResponseWriter, r *http.Request)
 		Result []Coordinates `json:"results"`
 	}
 	//Fetching data from Geocoding API, with count 1, to retrieve first city with this name
-	err := fetchURLdata(utils.GEOCODING_API+capital+"&count=1", true, w, &myCoordinates)
+	err := fetchURLdata(utils.GEOCODING_API+capital+"&count=1", w, &myCoordinates)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -329,7 +320,7 @@ func retrieveWeather(longitude myFloat, latitude myFloat, w http.ResponseWriter,
 	}
 
 	//Fetching data from the forecast API
-	err := fetchURLdata(utils.FORECAST_API+"latitude="+lat+"&longitude="+long+"&hourly=temperature_2m,precipitation&forecast_days=1", true, w, &myWeather)
+	err := fetchURLdata(utils.FORECAST_API+"latitude="+lat+"&longitude="+long+"&hourly=temperature_2m,precipitation&forecast_days=1", w, &myWeather)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -360,7 +351,7 @@ func retrieveCurrencyExchangeRates(currency string, w http.ResponseWriter, r *ht
 		Currency map[string]myFloat `json:"rates"`
 	}
 
-	err := fetchURLdata(utils.CURRENCY_API+currency, true, w, &Currencies)
+	err := fetchURLdata(utils.CURRENCY_API+currency, w, &Currencies)
 	if err != nil {
 		return nil, err
 	}
@@ -371,6 +362,7 @@ func retrieveCurrencyExchangeRates(currency string, w http.ResponseWriter, r *ht
 	return currencyData, nil
 }
 
+// Function that takes the time noe, and shows it in correct format
 func whatTimeNow() string {
 	currentTime := time.Now()
 	timeLayout := "20060102 15:04" //YYYYMMDD HH:mm
@@ -379,6 +371,7 @@ func whatTimeNow() string {
 	return formattedTime
 }
 
+// Function that shows float numbers with two decimals
 func floatFormat(number myFloat) (myFloat, error) {
 	stringFloat := strconv.FormatFloat(float64(number), 'f', 2, 64)
 	newFloat, err := strconv.ParseFloat(stringFloat, 64)
