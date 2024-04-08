@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/firestore" //Firestore-specific support
 	"google.golang.org/api/iterator"
@@ -77,29 +78,33 @@ func handlePostRegistration(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Check if the valid country country/isocode already exists in the Firestore database
-			if !exists {
+			if exists {
+				log.Println("Invalid input: Country is already registered")
+				return
 
+			} else {
 				// Check if the target currencies are all valid values
 				validCurrencies, err := checkValidCurrencies(w, registration)
 				if err != nil {
 					http.Error(w, "Error: Internal server error. "+err.Error(), http.StatusInternalServerError)
 					return
 				}
-				if validCurrencies {
+				if validCurrencies != nil {
 					log.Println("Valid input: Field values " + validIsocode + " with " + validCountry + " will be registereded")
-					log.Println("Valid input: Target currencies")
-					http.Error(w, "Valid value: Fields 'country': "+validCountry+" with it's 'isocode': "+validIsocode+" will be registered", http.StatusProcessing)
 
-					//postRegistration(w, registration)
+					registration.Country = validCountry
+					registration.Isocode = validIsocode
+					registration.Features.TargetCurrencies = validCurrencies
+
+					postRegistration(w, r, registration)
+
+					return
 
 				} else {
 					http.Error(w, "Detected invalid currency from 'targetCurrencies' field "+
 						"\nSuggestion: Please have all currencies be written as valid 3-letter currency code (ISO 4217)", http.StatusBadRequest)
 				}
 
-			} else {
-				log.Println("Invalid input: Country is already registered")
-				return
 			}
 
 		}
@@ -214,15 +219,15 @@ func checkCountryExists(ctx context.Context, client *firestore.Client, w http.Re
 		return false, nil
 	} else {
 		// Document found with the specified field value, returning the document ID
-		log.Println("Country: " + country + " already exists in Firestore database with ID: " + doc.Ref.ID)
-		http.Error(w, "Invalid input: "+country+" already exists in document with ID: "+doc.Ref.ID+
+		log.Println("Country: " + country + " already exists in Firestore database, with ID: " + doc.Ref.ID)
+		http.Error(w, "Invalid input: "+country+" already exists in document, with ID: "+doc.Ref.ID+
 			".\n Suggestion: Use 'UPDATE' or 'PUT' to change pre-existing dashboards", http.StatusConflict)
 		return true, nil
 	}
 }
 
 // Functon to check valid currencies accordingly
-func checkValidCurrencies(w http.ResponseWriter, s utils.Registration) (bool, error) {
+func checkValidCurrencies(w http.ResponseWriter, s utils.Registration) ([]string, error) {
 
 	// Currencies from client input
 	currencies := s.Features.TargetCurrencies
@@ -259,7 +264,7 @@ func checkValidCurrencies(w http.ResponseWriter, s utils.Registration) (bool, er
 			// Handle error if the request fails
 			log.Println("Error: checking currency validity. ", err)
 			http.Error(w, "Error: checking currency validity", http.StatusInternalServerError)
-			return false, err
+			return nil, err
 		}
 
 		// Check if the response status code is OK
@@ -267,29 +272,30 @@ func checkValidCurrencies(w http.ResponseWriter, s utils.Registration) (bool, er
 			log.Println("Valid currency:", currency)
 		} else { // return false when encountering invalid currency
 			log.Println("Invalid currency:", currency)
-			return false, nil
+			return nil, err
 		}
 	}
 
-	return true, nil
+	return uniqueCurrenciesSlice, nil
 }
 
-/*
-func postRegistration(w http.ResponseWriter, r utils.Registration) {
+func postRegistration(w http.ResponseWriter, r *http.Request, reg utils.Registration) {
+
+	nested := reg.Features
 
 	// Add the decoded date into Firestore
 	id, _, err := client.Collection(collection).Add(ctx,
 		map[string]interface{}{
-			"country": r.Country,
-			"isoCode": r.Isocode,
+			"country": reg.Country,
+			"isoCode": reg.Isocode,
 			"features": map[string]interface{}{
-				"temperature":      r.Features.Temperature,
-				"precipitation":    r.Features.Precipitation,
-				"capital":          r.Features.Capital,
-				"coordinates":      r.Features.Coordinates,
-				"population":       r.Features.Population,
-				"area":             r.Features.Area,
-				"targetCurrencies": r.Features.TargetCurrencies,
+				"temperature":      nested.Temperature,
+				"precipitation":    nested.Precipitation,
+				"capital":          nested.Capital,
+				"coordinates":      nested.Coordinates,
+				"population":       nested.Population,
+				"area":             nested.Area,
+				"targetCurrencies": nested.TargetCurrencies,
 			},
 		})
 	// Return the associated ID and when the configuration was last changed if the configuration was registered successfully
@@ -298,11 +304,29 @@ func postRegistration(w http.ResponseWriter, r utils.Registration) {
 		log.Println("Failed to add document to Firestore:", err)
 		return
 	} else {
+
 		// Returns document ID and time last updated in body
+		regResponse := utils.RegResponse{
+			ID:         id.ID,
+			LastChange: time.Now(),
+		}
+
+		// Encode the repsonse in JSON format
+		responseJSON, err := json.Marshal(regResponse)
+		if err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		// Set content type header
+		w.Header().Set("Content-Type", "application/json")
+
+		// Write the response JSON and return appropriate status code
+		w.WriteHeader(http.StatusCreated)
+		w.Write(responseJSON)
+
 		log.Println("Document added to collection. Identifier of return document: ", id.ID)
-		http.Error(w, id.ID, http.StatusCreated)
 		return
 	}
 
 }
-*/

@@ -17,12 +17,11 @@ type Features struct {
 	Population       bool     `json:"population, omitempty"`
 	Area             bool     `json:"area, omitempty"`
 	TargetCurrencies []string `json:"targetcurrencies, omitempty"`
-	LastChange       []Change `json:"lastchange, omitempty"`
 }
 
-type Change struct {
-	ID         int       `json:"id"`
-	LastChange time.Time `json:"lastchange"`
+type RegResponse struct {
+	ID         string    `json:"id"`
+	LastChange time.Time `json:"lastChange"`
 }
 
 // Struct for country API
