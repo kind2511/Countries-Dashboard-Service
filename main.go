@@ -48,7 +48,7 @@ func main() {
 	}()
 
 	// Set Firestore client in handler package
-    handler.SetFirestoreClient(ctx, client)
+	handler.SetFirestoreClient(ctx, client)
 
 	port := os.Getenv("PORT")
 
@@ -71,8 +71,3 @@ func main() {
 		panic(errSrv)
 	}
 }
-
-
-
-
-
