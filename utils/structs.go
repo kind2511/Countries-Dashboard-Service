@@ -1,5 +1,7 @@
 package utils
 
+import "time"
+
 // Struct for registration
 type Dashboard struct {
 	ID          DashboardResponse `json:"id"`
@@ -32,8 +34,6 @@ type CountryInfo struct {
 	} `json:"name"`
 	Isocode string `json:"cca2"`
 }
-
-import "time"
 
 // Status Struct for status
 type Status struct {

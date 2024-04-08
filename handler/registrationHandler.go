@@ -263,7 +263,7 @@ func handlePostRegistration(w http.ResponseWriter, d utils.Dashboard) {
 	nested := d.RegFeatures
 
 	// Current formatted time
-	timeNow := whatTimeNow()
+	timeNow := whatTimeNow2()
 
 	// Add the decoded date into Firestore
 	id, _, err := client.Collection(collection).Add(ctx,
@@ -316,7 +316,7 @@ func handlePostRegistration(w http.ResponseWriter, d utils.Dashboard) {
 /*
 Function that takes the time now, and shows it in correct format
 */
-func whatTimeNow() string {
+func whatTimeNow2() string {
 	currentTime := time.Now()
 	timeLayout := "2006-01-02 15:04" //YYYYMMDD HH:mm
 
