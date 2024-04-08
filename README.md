@@ -1,93 +1,498 @@
-# Assignment2
+# Countries Dashboard Service
+
+[TOC]
+
+# Overview
+
+In this group assignment, we have develop a REST web application in Golang that provides the client with the ability to configure information dashboards that are dynamically populated when requested. The dashboard configurations are saved in our service in a persistent way, and populated based on external services. It also include a simple notification service that can listen to specific events. The application is dockerized and deployed using an IaaS system. The service manage state using databases, as well as webhooks as notification feature and a different deployment mechanism.
+
+The services used for this purpose are:
+* *REST Countries API* (instance hosted)
+  * Endpoint: http://129.241.150.113:8080/v3.1
+  * Documentation: http://129.241.150.113:8080/
+* *Open-Meteo APIs* (hosted externally)
+  * Documentation: https://open-meteo.com/en/features#available-apis
+* *Currency API*
+  * Endpoint: http://129.241.150.113:9090/currency/
+  * Documentation: http://129.241.150.113:9090/
+
+The final web service is deployed in our local OpenStack instance SkyHigh. 
+
+# Specification
+
+The implementation of the service API follow this specification, i.e., the schemas (or syntax) of request and response messages, alongside method and status codes should correspond to the ones provided below. Requests and responses are expressed using examples to illustrate the structure in populated messages.
 
 
+## Endpoints
 
-## Getting started
-
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+Our web service have four resource root paths: 
 
 ```
-cd existing_repo
-git remote add origin https://git.gvk.idi.ntnu.no/course/prog2005/prog2005-2024-workspace/mikaels/group20/assignment2.git
-git branch -M main
-git push -uf origin main
+/dashboard/v1/registrations/
+/dashboard/v1/dashboards/
+/dashboard/v1/notifications/
+/dashboard/v1/status/
 ```
 
-## Integrate with your tools
+The specification has the following conventions for placeholders:
 
-- [ ] [Set up project integrations](https://git.gvk.idi.ntnu.no/course/prog2005/prog2005-2024-workspace/mikaels/group20/assignment2/-/settings/integrations)
+* {value} - *mandatory* value
+* {value?} - *optional* value
+* {?key=value} - *mandatory* parameter (key-value pair)
+* {?key=value?} - *optional* parameter (key-value pair)
+* {?key=value*} - one or more optional parameters 
 
-## Collaborate with your team
+## Endpoint 'Registrations': Registering dashboard configuration
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+The initial endpoint focuses on the management of dashboard configurations that can later be used via the `dashboards` endpoint.
 
-## Test and Deploy
+### Register new dashboard configuration
 
-Use the built-in continuous integration in GitLab.
+Manages the registration of new dashboard configurations that indicate which information is to be shown for registered dashboards. This includes weather, country and currency exchange information.
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+### - Request (POST) 
 
-***
+```
+Method: POST
+Path: /dashboard/v1/registrations/
+Content type: application/json
+```
 
-# Editing this README
+Body (exemplary code):
+```
+{
+   "country": "Norway",                                     // Indicates country name (alternatively to ISO code, i.e., country name can be empty if ISO code field is filled and vice versa)
+   "isoCode": "NO",                                         // Indicates two-letter ISO code for country (alternatively to country name)
+   "features": {
+                  "temperature": true,                      // Indicates whether temperature in degree Celsius is shown
+                  "precipitation": true,                    // Indicates whether precipitation (rain, showers and snow) is shown
+                  "capital": true,                          // Indicates whether the name of the capital is shown
+                  "coordinates": true,                      // Indicates whether country coordinates are shown
+                  "population": true,                       // Indicates whether population is shown
+                  "area": true,                             // Indicates whether land area size is shown
+                  "targetCurrencies": ["EUR", "USD", "SEK"] // Indicates which exchange rates (to target currencies) relative to the base currency of the registered country (in this case NOK for Norway) are shown
+               }
+}
+```
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+### - Response
 
-## Suggestions for a good README
+The response to the POST request on the endpoint stores the configuration on the server and returns the associated ID. In the example below, it is the ID `1`. Responses show be encoded in the above-mentioned JSON format, with the `lastChange` field highlighting the last change to the configuration (including updates via `PUT` - see later)
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+* Content type: `application/json`
+* Status code: Appropriate error code.
 
-## Name
-Choose a self-explaining name for your project.
+Body (exemplary code for registered configuration):
+```
+{
+    "id": 1
+    "lastChange": "2024-02-29 12:31"
+}
+```
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+### View a **specific registered dashboard configuration**
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+Enables retrieval of a specific registered dashboard configuration.
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+### - Request (GET)
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+The following shows a request for an individual configuration identified by its ID.
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+```
+Method: GET
+Path: /dashboard/v1/registrations/{id}
+```
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+* `id` is the ID associated with the specific configuration.
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+Example request: ```/dashboard/v1/registrations/1``` 
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+### - Response
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+* Content type: `application/json`
+* Status code: Appropriate error code. 
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+Body (exemplary code):
+```
+{
+   "id": 1,
+   "country": "Norway",
+   "isoCode": "NO",
+   "features": {
+                  "temperature": true,
+                  "precipitation": true,
+                  "capital": true,
+                  "coordinates": true,
+                  "population": true,
+                  "area": false,
+                  "targetCurrencies": ["EUR", "USD", "SEK"]
+               },
+    "lastChange": "20240229 14:07"
+}
+```
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+### View **all registered dashboard configurations**
 
-## License
-For open source projects, say how it is licensed.
+Enables retrieval of all registered dashboard configurations.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+### - Request (GET)
+
+A `GET` request to the endpoint should return all registered configurations including IDs and timestamps of last change.
+
+```
+Method: GET
+Path: /dashboard/v1/registrations/
+```
+
+### - Response
+
+* Content type: `application/json`
+* Status code: Appropriate error code.
+
+Body (exemplary code):
+```
+[
+   {
+      "id": 1,
+      "country": "Norway",
+      "isoCode": "NO",
+      "features": {
+                     "temperature": true,
+                     "precipitation": true,
+                     "capital": true,
+                     "coordinates": true,
+                     "population": true,
+                     "area": false,
+                     "targetCurrencies": ["EUR", "USD", "SEK"]
+                  }, 
+      "lastChange": "20240229 14:07"
+   },
+   {
+      "id": 2,
+      "country": "Denmark",
+      "isoCode": "DK",
+      "features": {
+                     "temperature": false,
+                     "precipitation": true,
+                     "capital": true,
+                     "coordinates": true,
+                     "population": false,
+                     "area": true,
+                     "targetCurrencies": ["NOK", "MYR", "JPY", "EUR"]
+                  },
+       "lastChange": "20240224 08:27"
+   },
+   ...
+]
+```
+
+The response return a collection of return all stored configurations.
+
+
+### Replace a **specific registered dashboard configuration**
+
+Enables the replacing of specific registered dashboard configurations.
+
+### - Request (PUT)
+
+The following shows a request for an updated of individual configuration identified by its ID. This update should lead to an update of the configuration and an update of the associated timestamp (`lastChange`).
+
+```
+Method: PUT
+Path: /dashboard/v1/registrations/{id}
+```
+
+* `id` is the ID associated with the specific configuration.
+
+Example request: ```/dashboard/v1/registrations/1``` 
+
+Body (exemplary code):
+```
+{
+   "country": "Norway",
+   "isoCode": "NO",
+   "features": {
+                  "temperature": false, // this value is to be changed
+                  "precipitation": true,
+                  "capital": true,
+                  "coordinates": true, 
+                  "population": true,
+                  "area": false,
+                  "targetCurrencies": ["EUR", "SEK"] // this value is to be changed
+               }
+}
+```
+
+Note that the request neither contains ID in the body (only in the URL), and neither contains the timestamp.  
+
+
+### - Response
+
+This is the response to the change request.
+
+* Status code: Appropriate error code.
+* Body: empty
+
+### Delete a **specific registered dashboard configuration**
+
+Enabling the deletion of a specific registered dashboard configuration.
+
+### - Request (DELETE)
+
+The following shows a request for deletion of an individual configuration identified by its ID. This update should lead to a deletion of the configuration on the server.
+
+```
+Method: DELETE
+Path: /dashboard/v1/registrations/{id}
+```
+
+* `id` is the ID associated with the specific configuration.
+
+Example request: ```/dashboard/v1/registrations/1``` 
+
+### - Response
+
+This is the response to the delete request.
+
+* Status code: Appropriate error code.
+* Body: empty
+
+## Endpoint 'Dashboards': Retrieve populated dashboard
+
+This endpoint can be used to retrieve the populated dashboards.
+
+### - Request (GET) - Retrieving a **specific populated dashboard**
+
+The following shows a request for an individual dashboard identified by its ID (same as the corresponding configuration ID).
+
+```
+Method: GET
+Path: /dashboard/v1/dashboards/{id}
+```
+
+* `id` is the ID associated with the specific configuration.
+
+Example request: ```/dashboard/v1/dashboards/1``` 
+
+### - Response
+
+* Content type: `application/json`
+* Status code: Appropriate error code.
+
+Body (exemplary code):
+```
+{
+   "country": "Norway",
+   "isoCode": "NO",
+   "features": {
+                  "temperature": -1.2,                       // Mean temperature across all forecasted temperature values for country's coordinates
+                  "precipitation": 0.80,                     // Mean precipitation across all returned precipitation values
+                  "capital": "Oslo",                         // Capital: Where multiple values exist, take the first
+                  "coordinates": {                           // Those are the country geocoordinates
+                                    "latitude": 62.0,
+                                    "longitude": 10.0
+                                 },
+                  "population": 5379475,
+                  "area": 323802.0,
+                  "targetCurrencies": {
+                                         "EUR": 0.087701435,  // this is the current NOK to EUR exchange rate (where multiple currencies exist for a given country, take the first)
+                                         "USD": 0.095184741, 
+                                         "SEK": 0.97827275
+                                       }
+               },
+    "lastRetrieval": "20240229 18:15" // this should be the current time (i.e., the time of retrieval)
+}
+```
+
+## Endpoint 'Notifications': Managing webhooks for event notifications
+
+As an additional feature, users can register webhooks that are triggered by the service based on specified events, specifically if a new configuration is created, changed or deleted. Users can also register for invocation events, i.e., when a dashboard for a given country is invoked. Users can register multiple webhooks. The registrations should survive a service restart (i.e., be persistently stored).
+
+### Registration of Webhook
+
+### - Request (POST)
+
+```
+Method: POST
+Path: /dashboard/v1/notifications/
+Content type: application/json
+```
+
+The body contains 
+ * the URL to be triggered upon event (the service that should be invoked)
+ * the country for which the trigger applies (if empty, it applies to any invocation)
+ * Events: 
+   * `REGISTER` - webhook is invoked if a new configuration is registered
+   * `CHANGE` - webhook is invoked if configuration is modified
+   * `DELETE` - webhook is invoked if configuration is deleted
+   * `INVOKE` - webhook is invoked if dashboard is retrieved (i.e., populated with values)
+
+Body (Exemplary message based on schema):
+```
+{
+   "url": "https://localhost:8080/client/",  // URL to be invoked when event occurs
+   "country": "NO",                          // Country that is registered, or empty if all countries
+   "event": "INVOKE"                         // Event on which it is invoked
+}
+```
+### - Response
+
+The response contains the ID for the registration that can be used to see detail information or to delete the webhook registration. The format of the ID is not prescribed, as long it is unique. Consider best practices for determining IDs.
+
+* Content type: `application/json`
+* Status code: Choose an appropriate status code
+
+Body (Exemplary message based on schema):
+```
+{
+    "id": "OIdksUDwveiwe"
+}
+```
+
+### Deletion of Webhook
+
+Deletes a given webhook.
+
+### - Request (DELETE)
+
+```
+Method: DELETE
+Path: /dashboard/v1/notifications/{id}
+```
+
+* {id} is the ID returned during the webhook registration
+
+### - Response
+
+Implemented the response according to best practices.
+
+### View *specific registered* webhook
+
+Shows a specific webhook registration.
+
+### - Request (GET)
+
+```
+Method: GET
+Path: /dashboard/v1/notifications/{id}
+```
+* `{id}` is the ID for the webhook registration
+
+### - Response
+
+The response is similar to the POST request body, but further includes the ID assigned by the server upon adding the webhook.
+
+* Content type: `application/json`
+
+Body (Exemplary message based on schema):
+```
+{
+   "id": "OIdksUDwveiwe",
+   "url": "https://localhost:8080/client/",
+   "country": "NO",
+   "event": "INVOKE"
+}
+
+```
+
+### View *all registered* webhooks
+
+Lists all registered webhooks.
+
+### - Request (GET)
+
+```
+Method: GET
+Path: /dashboard/v1/notifications/
+```
+
+### - Response
+
+The response is a collection of all registered webhooks.
+
+* Content type: `application/json`
+
+Body (Exemplary message based on schema):
+```
+[
+   {
+      "id": "OIdksUDwveiwe",
+      "url": "https://localhost:8080/client/",
+      "country": "NO",
+      "event": "INVOKE"
+   },
+   {
+      "webhook_id": "DiSoisivucios",
+      "url": "https://localhost:8081/anotherClient/",
+      "country": "",                                 // field can also be omitted if registered for all countries
+      "event": "REGISTER"
+   },
+   ...
+]
+```
+
+### Webhook Invocation (upon trigger)
+
+When a webhook is triggered, it should send information as follows. Where multiple webhooks are triggered, the information should be sent separately (i.e., one notification per triggered webhook).
+
+```
+Method: POST
+Path: <url specified in the corresponding webhook registration>
+Content type: application/json
+```
+
+Body (Exemplary message based on schema):
+```
+{
+   "id": "OIdksUDwveiwe",
+   "country": "NO",
+   "event": "INVOKE",
+   "time": "20240223 06:23"      // time at which the event occurred
+}
+```
+
+
+## Endpoint 'Status': Monitoring service availability
+
+The status interface indicates the availability of all individual services this service depends on. The reporting occurs based on status codes returned by the dependent services. The status interface further provides information about the number of registered webhooks (specification below), and the uptime of the service.
+
+### - Request (GET)
+
+```
+Method: GET
+Path: dashboard/v1/status/
+```
+
+### - Response
+
+* Content type: `application/json`
+* Status code: 200 if everything is OK, appropriate error code otherwise. 
+
+Body:
+```
+{
+   "countries_api": <http status code for *REST Countries API*>,
+   "meteo_api": <http status code for *Meteo API*>, 
+   "currency_api": <http status code for *Currency API*>,
+   "notification_db": <http status code for *Notification database*>,
+   ...
+   "webhooks": <number of registered webhooks>,
+   "version": "v1",
+   "uptime": <time in seconds from the last service restart>
+}
+```
+
+Note: `<some value>` indicates placeholders for values to be populated by the service as described for the corresponding values.
+
+# Additional requirements
+
+* All endpoints should be *tested using automated testing facilities provided by Go (unit tests, httptest package)*. 
+  * This includes the stubbing of the third-party endpoints to ensure test reliability (removing dependency on external services).
+  * Include the testing of handlers using the httptest package. Your code should be structured to support this. 
+  * Try to maximize test coverage as reported by Golang.
+* Think about which information you can cache to minimise invocation on the third-party libraries. Use Firebase for this purpose.
+
+
+# Deployment
+
+The service is to be deployed on an IaaS solution OpenStack using Docker (both to be discussed in class). You will need to provide the URL to the deployed service as part of the submission, in addition the source repository.
