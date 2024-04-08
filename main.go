@@ -49,6 +49,8 @@ func main() {
 		}
 	}()
 
+	handler.SetFirestoreClient(ctx, client)
+
 	port := os.Getenv("PORT")
 
 	if port == "" {

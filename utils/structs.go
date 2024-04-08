@@ -2,14 +2,14 @@ package utils
 
 // Struct for registration
 type Dashboard struct {
-	ID         DashboardResponse `json:"id"`
-	Country    string            `json:"country"`
-	Isocode    string            `json:"isocode,omitempty"`
-	Features   Features          `json:"features, omitempty"`
-	LastChange string            `json:"lastChange"`
+	ID          DashboardResponse `json:"id"`
+	Country     string            `json:"country"`
+	Isocode     string            `json:"isocode,omitempty"`
+	RegFeatures RegFeatures       `json:"features, omitempty"`
+	LastChange  string            `json:"lastChange"`
 }
 
-type Features struct {
+type RegFeatures struct {
 	Temperature      bool     `json:"temperature, omitempty"` // Note: In degrees Celsius
 	Precipitation    bool     `json:"precipitation, omitempty"`
 	Capital          bool     `json:"capital, omitempty"`

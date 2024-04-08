@@ -88,7 +88,7 @@ func handlePostRegistration(w http.ResponseWriter, r *http.Request) {
 
 				dashboard.Country = validCountry
 				dashboard.Isocode = validIsocode
-				dashboard.Features.TargetCurrencies = validCurrencies
+				dashboard.RegFeatures.TargetCurrencies = validCurrencies
 
 				// Post registered dashboard
 				postRegistration(w, dashboard)
@@ -202,7 +202,7 @@ Functon to check valid currencies accordingly
 func checkValidCurrencies(w http.ResponseWriter, d utils.Dashboard) ([]string, error) {
 
 	// Currencies from client input
-	currencies := d.Features.TargetCurrencies
+	currencies := d.RegFeatures.TargetCurrencies
 
 	// Initialize an empty hashmap of string-struct pairs
 	uniqueCurrencies := make(map[string]struct{})
@@ -211,7 +211,7 @@ func checkValidCurrencies(w http.ResponseWriter, d utils.Dashboard) ([]string, e
 	uniqueCurrenciesSlice := make([]string, 0, len(currencies))
 
 	// iterate through the currnecies array to remove duplicates
-	for _, currency := range d.Features.TargetCurrencies {
+	for _, currency := range d.RegFeatures.TargetCurrencies {
 		// Skip empty strings
 		if currency == "" {
 			continue
@@ -253,7 +253,7 @@ func checkValidCurrencies(w http.ResponseWriter, d utils.Dashboard) ([]string, e
 
 func postRegistration(w http.ResponseWriter, d utils.Dashboard) {
 
-	nested := d.Features
+	nested := d.RegFeatures
 
 	// Current formatted time
 	timeNow := whatTimeNow()
