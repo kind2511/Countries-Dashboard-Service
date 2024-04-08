@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore" //Firestore-specific support
-	"google.golang.org/api/iterator"
 )
 
 // Collection name in firestore
@@ -20,7 +19,9 @@ const collection = "registrations"
 var ctx context.Context
 var client *firestore.Client
 
-// Sets the frestore client
+/*
+Sets the frestore client
+*/
 func SetFirestoreClient(c context.Context, cli *firestore.Client) {
 	ctx = c
 	client = cli
@@ -37,7 +38,9 @@ func RegistrationHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Handler for registering a new dashboard configuration, which get sendt to Firestore as a document
+/*
+Handler for registering a new dashboard configuration, which get sendt to Firestore as a document
+*/
 func handlePostRegistration(w http.ResponseWriter, r *http.Request) {
 
 	// Instantiate decoder
@@ -47,10 +50,10 @@ func handlePostRegistration(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 
 	// Empty registration struct to populate
-	registration := utils.Registration{}
+	dashboard := utils.Dashboard{}
 
 	// Decode registration instance
-	err := decoder.Decode(&registration)
+	err := decoder.Decode(&dashboard)
 	if err != nil {
 		log.Println("Error: decoding JSON", err)
 		http.Error(w, "Error: decoding JSON, Invalid inputs "+err.Error(), http.StatusBadRequest)
@@ -58,61 +61,53 @@ func handlePostRegistration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if both fields are empty
-	if registration.Country == "" && registration.Isocode == "" {
+	if dashboard.Country == "" && dashboard.Isocode == "" {
 		log.Println("Invalid input: Fields 'Country' and 'Isocode' are empty")
 		http.Error(w, "Invalid input: Fields 'Country' and 'Isocode' are empty."+
 			"\n Suggestion: Fill both or one of the fields to register a dashboard", http.StatusBadRequest)
 
 	} else { // Validate country and isocode fields
-		validIsocode, validCountry, err := handleValidCountryAndCode(w, registration)
+		validIsocode, validCountry, err := handleValidCountryAndCode(w, dashboard)
 		if err != nil {
 			log.Println("Invalid input: Fields 'Country' and or 'Isocode'", err)
 			http.Error(w, "Invalid input: Fields 'Country' and or 'Isocode'", http.StatusBadRequest)
 			return
 		}
+
+		// If there is returned valid country and isocode
 		if validIsocode != "" && validCountry != "" {
-			exists, err := checkCountryExists(ctx, client, w, validCountry)
+
+			// Check if the target currencies are all valid values
+			validCurrencies, err := checkValidCurrencies(w, dashboard)
 			if err != nil {
 				http.Error(w, "Error: Internal server error. "+err.Error(), http.StatusInternalServerError)
 				return
 			}
+			if validCurrencies != nil {
+				log.Println("Valid input: Field values 'country': " + validCountry + " matching 'isocode': " + validIsocode + " will be registereded")
 
-			// Check if the valid country country/isocode already exists in the Firestore database
-			if exists {
-				log.Println("Invalid input: Country is already registered")
+				dashboard.Country = validCountry
+				dashboard.Isocode = validIsocode
+				dashboard.Features.TargetCurrencies = validCurrencies
+
+				// Post registered dashboard
+				postRegistration(w, dashboard)
+
 				return
 
 			} else {
-				// Check if the target currencies are all valid values
-				validCurrencies, err := checkValidCurrencies(w, registration)
-				if err != nil {
-					http.Error(w, "Error: Internal server error. "+err.Error(), http.StatusInternalServerError)
-					return
-				}
-				if validCurrencies != nil {
-					log.Println("Valid input: Field values " + validIsocode + " with " + validCountry + " will be registereded")
-
-					registration.Country = validCountry
-					registration.Isocode = validIsocode
-					registration.Features.TargetCurrencies = validCurrencies
-
-					postRegistration(w, r, registration)
-
-					return
-
-				} else {
-					http.Error(w, "Detected invalid currency from 'targetCurrencies' field "+
-						"\nSuggestion: Please have all currencies be written as valid 3-letter currency code (ISO 4217)", http.StatusBadRequest)
-				}
-
+				http.Error(w, "Detected invalid currency from 'targetCurrencies' field "+
+					"\nSuggestion: Please have all currencies be written as valid 3-letter currency code (ISO 4217)", http.StatusBadRequest)
 			}
 
 		}
 	}
 }
 
-// Functon to handle country and or isocode accordingly
-func handleValidCountryAndCode(w http.ResponseWriter, s utils.Registration) (string, string, error) {
+/*
+Functon to handle country and or isocode accordingly
+*/
+func handleValidCountryAndCode(w http.ResponseWriter, s utils.Dashboard) (string, string, error) {
 
 	// country and isocode registration input from client
 	country := s.Country
@@ -170,7 +165,7 @@ func handleValidCountryAndCode(w http.ResponseWriter, s utils.Registration) (str
 	}
 
 	// Handle when either the country or isocode input is a valid value matching the API's value
-	if strings.ToUpper(country) == strings.ToUpper(apiInfo[0].Name.Common) {
+	if strings.EqualFold(country, apiInfo[0].Name.Common) {
 		// Making sure that empty/ invalid isocode field is returned with the matching isocode from the country input
 		if isocode != "" || isocode == "" {
 			return apiInfo[0].Isocode, apiInfo[0].Name.Common, nil
@@ -201,36 +196,13 @@ func handleValidCountryAndCode(w http.ResponseWriter, s utils.Registration) (str
 	return "", "", nil
 }
 
-// Check if a specific country is already registered into the Firestore database
-func checkCountryExists(ctx context.Context, client *firestore.Client, w http.ResponseWriter, country string) (bool, error) {
-
-	field := "country"
-	desiredValue := country
-
-	// Query the collection for documents where the specified field has the desired value
-	query := client.Collection(collection).Where(field, "==", desiredValue).Limit(1)
-	iter := query.Documents(ctx)
-
-	// Iterate through the documents
-	doc, err := iter.Next()
-	if err == iterator.Done {
-		// No more documents
-		log.Println("Country: " + country + " does not exist in Firestore database")
-		return false, nil
-	} else {
-		// Document found with the specified field value, returning the document ID
-		log.Println("Country: " + country + " already exists in Firestore database, with ID: " + doc.Ref.ID)
-		http.Error(w, "Invalid input: "+country+" already exists in document, with ID: "+doc.Ref.ID+
-			".\n Suggestion: Use 'UPDATE' or 'PUT' to change pre-existing dashboards", http.StatusConflict)
-		return true, nil
-	}
-}
-
-// Functon to check valid currencies accordingly
-func checkValidCurrencies(w http.ResponseWriter, s utils.Registration) ([]string, error) {
+/*
+Functon to check valid currencies accordingly
+*/
+func checkValidCurrencies(w http.ResponseWriter, d utils.Dashboard) ([]string, error) {
 
 	// Currencies from client input
-	currencies := s.Features.TargetCurrencies
+	currencies := d.Features.TargetCurrencies
 
 	// Initialize an empty hashmap of string-struct pairs
 	uniqueCurrencies := make(map[string]struct{})
@@ -239,7 +211,7 @@ func checkValidCurrencies(w http.ResponseWriter, s utils.Registration) ([]string
 	uniqueCurrenciesSlice := make([]string, 0, len(currencies))
 
 	// iterate through the currnecies array to remove duplicates
-	for _, currency := range s.Features.TargetCurrencies {
+	for _, currency := range d.Features.TargetCurrencies {
 		// Skip empty strings
 		if currency == "" {
 			continue
@@ -279,15 +251,18 @@ func checkValidCurrencies(w http.ResponseWriter, s utils.Registration) ([]string
 	return uniqueCurrenciesSlice, nil
 }
 
-func postRegistration(w http.ResponseWriter, r *http.Request, reg utils.Registration) {
+func postRegistration(w http.ResponseWriter, d utils.Dashboard) {
 
-	nested := reg.Features
+	nested := d.Features
+
+	// Current formatted time
+	timeNow := whatTimeNow()
 
 	// Add the decoded date into Firestore
 	id, _, err := client.Collection(collection).Add(ctx,
 		map[string]interface{}{
-			"country": reg.Country,
-			"isoCode": reg.Isocode,
+			"country": d.Country,
+			"isoCode": d.Isocode,
 			"features": map[string]interface{}{
 				"temperature":      nested.Temperature,
 				"precipitation":    nested.Precipitation,
@@ -297,6 +272,7 @@ func postRegistration(w http.ResponseWriter, r *http.Request, reg utils.Registra
 				"area":             nested.Area,
 				"targetCurrencies": nested.TargetCurrencies,
 			},
+			"lastChanged": timeNow,
 		})
 	// Return the associated ID and when the configuration was last changed if the configuration was registered successfully
 	if err != nil {
@@ -306,13 +282,13 @@ func postRegistration(w http.ResponseWriter, r *http.Request, reg utils.Registra
 	} else {
 
 		// Returns document ID and time last updated in body
-		regResponse := utils.RegResponse{
+		response := utils.DashboardResponse{
 			ID:         id.ID,
-			LastChange: time.Now(),
+			LastChange: timeNow,
 		}
 
 		// Encode the repsonse in JSON format
-		responseJSON, err := json.Marshal(regResponse)
+		responseJSON, err := json.Marshal(response)
 		if err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
@@ -329,4 +305,15 @@ func postRegistration(w http.ResponseWriter, r *http.Request, reg utils.Registra
 		return
 	}
 
+}
+
+/*
+Function that takes the time now, and shows it in correct format
+*/
+func whatTimeNow() string {
+	currentTime := time.Now()
+	timeLayout := "2006-01-02 15:04" //YYYYMMDD HH:mm
+
+	formattedTime := currentTime.Format(timeLayout)
+	return formattedTime
 }
