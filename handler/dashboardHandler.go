@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 // Own float type, either float32 or float64, whatever we see fit
@@ -86,118 +84,147 @@ func DashboardFunc(w http.ResponseWriter, r *http.Request) error {
 	//Finding out what ID is written in the URL path
 	myId := r.URL.Path[len(utils.DASHBOARD_PATH):]
 
-	//Goes through collection in firebase, and fetches document with Id.
-	res, err := client.Collection(collection).Doc(myId).Get(context.Background())
-	if err != nil {
+	//If the id
+	if len(myId) != 0 {
 
-		//If there is no document with specified id
-		if status.Code(err) == codes.NotFound {
-			http.Error(w, "Document with Id: '"+myId+"' does not exist", http.StatusBadRequest)
+		query := client.Collection(collection).Where("id", "==", myId).Documents(context.Background())
+
+		docs, err := query.GetAll()
+		if err != nil {
+			// Handle the error
+			return err
+		}
+
+		var myObject Recieved_Dashboard
+		if err := docs[0].DataTo(&myObject); err != nil {
+			return err
+		}
+
+		//Fetching variables from functions
+
+		//Fetching population, capital, their own currency and are
+		population, capital, countryCurrency, area, err := retrieveCountryData(myObject.Country, w, r)
+		if err != nil {
+			return err
+		}
+
+		//Fetching coordinates from chosen capital
+		longitude, latitude, err := retrieveCoordinates(capital, w, r)
+		if err != nil {
+			return err
+		}
+
+		//Fetching temperature and precipitation using coordinates
+		temperature, precipitation, err := retrieveWeather(longitude, latitude, w, r)
+		if err != nil {
+			return err
+		}
+
+		//Creating the result struct
+		var Result OutputDashboardWithData
+
+		//Assigning the values to the result struct
+		Result.Country = myObject.Country
+		Result.IsoCode = myObject.IsoCode
+
+		//Checks if a value is to be displayed, and then assigns the values if true
+		//-------------------------------------------------------------------------------------------
+		if myObject.Features.Temperature {
+			Result.Features.Temperature, err = floatFormat(temperature)
+			if err != nil {
+				return err
+			}
+		}
+		if myObject.Features.Precipitation {
+			Result.Features.Precipitation, err = floatFormat(precipitation)
+			if err != nil {
+				return err
+			}
+		}
+		if myObject.Features.Capital {
+			Result.Features.Capital = capital
+		}
+		if myObject.Features.Coordinates {
+			Result.Features.Coordinates.Longitude, err = floatFormat(longitude)
+			if err != nil {
+				return err
+			}
+			Result.Features.Coordinates.Latitude, err = floatFormat(latitude)
+			if err != nil {
+				return err
+			}
+		}
+		if myObject.Features.Area {
+			Result.Features.Area, err = floatFormat(area)
+			if err != nil {
+				return err
+			}
+		}
+		if myObject.Features.Population {
+			Result.Features.Population = population
+		}
+		//---------------------------------------------------------------------
+
+		//Making own map to set currencies with their exchangerates
+		c := make(map[string]myFloat)
+
+		//Makes the map with exchange rates for fetched currency earlier
+		currencyRates, err := retrieveCurrencyExchangeRates(countryCurrency, w, r)
+		if err != nil {
+			return err
+		}
+
+		//Runs through all currencies that are fetched from specified object
+		for _, currency := range myObject.Features.TargetCurrencies {
+			//Assigns currency rate to specified currencies from the fetched object
+			c[currency] = currencyRates[currency]
+		}
+		//Assigns map of exchange rates to result
+		Result.Features.TargetCurrencies = c
+
+		//Time for last retrieval being assigned using formatted time
+		Result.LastRetrieval = whatTimeNow()
+
+		//Sets header, and encodes the result
+		w.Header().Set("Content-type", "application/json")
+
+		if err := json.NewEncoder(w).Encode(Result); err != nil {
+			http.Error(w, "Failed to encode result", http.StatusInternalServerError)
+			return err
+		}
+
+	}
+	/*
+		var inputData []Recieved_Dashboard
+
+		//Fetching data from json file, which contains dashboards
+		err := fetchURLdata("test-data.json", false, w, &inputData)
+		if err != nil {
+			return err
+		}
+
+		//Checking and converting the id to int, which will be used for fetching object
+		myIdInt, err := strconv.Atoi(myId)
+		if err != nil {
+			http.Error(w, "'"+myId+"'"+" is not a valid id", http.StatusBadRequest)
+			return err
+		}
+		//Small function that returns object based on matching object Id
+		getObjectByID := func(id int) *Recieved_Dashboard {
+			for _, obj := range inputData {
+				if obj.Id == id {
+					return &obj
+				}
+			}
 			return nil
 		}
-		return err
-	}
-
-	//Creates the object using the struct, and sends data to the struct
-	var myObject Recieved_Dashboard
-	if err := res.DataTo(&myObject); err != nil {
-		return err
-	}
-
-	//Fetching variables from functions
-
-	//Fetching population, capital, their own currency and are
-	population, capital, countryCurrency, area, err := retrieveCountryData(myObject.Country, w, r)
-	if err != nil {
-		return err
-	}
-
-	//Fetching coordinates from chosen capital
-	longitude, latitude, err := retrieveCoordinates(capital, w, r)
-	if err != nil {
-		return err
-	}
-
-	//Fetching temperature and precipitation using coordinates
-	temperature, precipitation, err := retrieveWeather(longitude, latitude, w, r)
-	if err != nil {
-		return err
-	}
-
-	//Creating the result struct
-	var Result OutputDashboardWithData
-
-	//Assigning the values to the result struct
-	Result.Country = myObject.Country
-	Result.IsoCode = myObject.IsoCode
-
-	//Checks if a value is to be displayed, and then assigns the values if true
-	//-------------------------------------------------------------------------------------------
-	if myObject.Features.Temperature {
-		Result.Features.Temperature, err = floatFormat(temperature)
-		if err != nil {
+		//Getting object from an id. If nil, error is returned
+		myObject := getObjectByID(myIdInt)
+		if myObject == nil {
+			http.Error(w, "Object with Id "+"'"+myId+"' not found", http.StatusBadRequest)
 			return err
 		}
-	}
-	if myObject.Features.Precipitation {
-		Result.Features.Precipitation, err = floatFormat(precipitation)
-		if err != nil {
-			return err
-		}
-	}
-	if myObject.Features.Capital {
-		Result.Features.Capital = capital
-	}
-	if myObject.Features.Coordinates {
-		Result.Features.Coordinates.Longitude, err = floatFormat(longitude)
-		if err != nil {
-			return err
-		}
-		Result.Features.Coordinates.Latitude, err = floatFormat(latitude)
-		if err != nil {
-			return err
-		}
-	}
-	if myObject.Features.Area {
-		Result.Features.Area, err = floatFormat(area)
-		if err != nil {
-			return err
-		}
-	}
-	if myObject.Features.Population {
-		Result.Features.Population = population
-	}
-	//---------------------------------------------------------------------
-
-	//Making own map to set currencies with their exchangerates
-	c := make(map[string]myFloat)
-
-	//Makes the map with exchange rates for fetched currency earlier
-	currencyRates, err := retrieveCurrencyExchangeRates(countryCurrency, w, r)
-	if err != nil {
-		return err
-	}
-
-	//Runs through all currencies that are fetched from specified object
-	for _, currency := range myObject.Features.TargetCurrencies {
-		//Assigns currency rate to specified currencies from the fetched object
-		c[currency] = currencyRates[currency]
-	}
-	//Assigns map of exchange rates to result
-	Result.Features.TargetCurrencies = c
-
-	//Time for last retrieval being assigned using formatted time
-	Result.LastRetrieval = whatTimeNow()
-
-	//Sets header, and encodes the result
-	w.Header().Set("Content-type", "application/json")
-
-	if err := json.NewEncoder(w).Encode(Result); err != nil {
-		http.Error(w, "Failed to encode result", http.StatusInternalServerError)
-		return err
-	}
-
-	//Maybe put in something here, if we want to add in something extra
+	*/
 
 	return nil
 }
@@ -362,7 +389,6 @@ func retrieveCurrencyExchangeRates(currency string, w http.ResponseWriter, r *ht
 	return currencyData, nil
 }
 
-// Function that takes the time noe, and shows it in correct format
 func whatTimeNow() string {
 	currentTime := time.Now()
 	timeLayout := "20060102 15:04" //YYYYMMDD HH:mm
@@ -371,7 +397,6 @@ func whatTimeNow() string {
 	return formattedTime
 }
 
-// Function that shows float numbers with two decimals
 func floatFormat(number myFloat) (myFloat, error) {
 	stringFloat := strconv.FormatFloat(float64(number), 'f', 2, 64)
 	newFloat, err := strconv.ParseFloat(stringFloat, 64)
