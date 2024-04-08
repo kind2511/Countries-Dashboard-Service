@@ -60,6 +60,8 @@ func main() {
 
 	addr := ":" + port
 
+	addr := ":" + port
+
 	http.HandleFunc(utils.DEFAULT_PATH, handler.DefaultHandler)
 	http.HandleFunc(utils.REGISTRATION_PATH, handler.RegistrationHandler)
 
