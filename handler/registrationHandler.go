@@ -51,42 +51,59 @@ func handlePostRegistration(w http.ResponseWriter, r *http.Request) {
 	// Decode registration instance
 	err := decoder.Decode(&registration)
 	if err != nil {
-		http.Error(w, "Failed to decode request body due to: "+err.Error(), http.StatusBadRequest)
-		log.Println("Error decoding JSON ", err)
+		log.Println("Error: decoding JSON", err)
+		http.Error(w, "Error: decoding JSON, Invalid inputs "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Validate country and isocode fields
+	// Check if both fields are empty
 	if registration.Country == "" && registration.Isocode == "" {
-		log.Println("Both the country and isocode are empty")
-		http.Error(w, "Country and isocode fields are empty, please input both or one of them to register a dashboard", http.StatusBadRequest)
+		log.Println("Invalid input: Fields 'Country' and 'Isocode' are empty")
+		http.Error(w, "Invalid input: Fields 'Country' and 'Isocode' are empty."+
+			"\n Suggestion: Fill both or one of the fields to register a dashboard", http.StatusBadRequest)
 
-	} else {
+	} else { // Validate country and isocode fields
 		validIsocode, validCountry, err := handleValidCountryAndCode(w, registration)
 		if err != nil {
-			log.Println("Something went wrong when validating country and isocode", err)
-			http.Error(w, "Something went wrong when validating country and isocode", http.StatusBadRequest)
+			log.Println("Invalid input: Fields 'Country' and or 'Isocode'", err)
+			http.Error(w, "Invalid input: Fields 'Country' and or 'Isocode'", http.StatusBadRequest)
 			return
 		}
-
 		if validIsocode != "" && validCountry != "" {
-			log.Println("Is a valid input:", validIsocode, validCountry)
-			//postRegistration(w, registration)
-		}
+			exists, err := checkCountryExists(ctx, client, w, validCountry)
+			if err != nil {
+				http.Error(w, "Error: Internal server error. "+err.Error(), http.StatusInternalServerError)
+				return
+			}
 
-		// Check if country or isocode already exists in the Firestore database
-		exists, err := checkCountryExists(ctx, client, w, validCountry)
-		if err != nil {
-			http.Error(w, "Error checking country: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
+			// Check if the valid country country/isocode already exists in the Firestore database
+			if !exists {
 
-		if exists {
-			http.Error(w, "Use PUT or UPDATE if change is wanted", http.StatusConflict)
-			return
+				// Check if the target currencies are all valid values
+				validCurrencies, err := checkValidCurrencies(w, registration)
+				if err != nil {
+					http.Error(w, "Error: Internal server error. "+err.Error(), http.StatusInternalServerError)
+					return
+				}
+				if validCurrencies {
+					log.Println("Valid input: Field values " + validIsocode + " with " + validCountry + " will be registereded")
+					log.Println("Valid input: Target currencies")
+					http.Error(w, "Valid value: Fields 'country': "+validCountry+" with it's 'isocode': "+validIsocode+" will be registered", http.StatusProcessing)
+
+					//postRegistration(w, registration)
+
+				} else {
+					http.Error(w, "Detected invalid currency from 'targetCurrencies' field "+
+						"\nSuggestion: Please have all currencies be written as valid 3-letter currency code (ISO 4217)", http.StatusBadRequest)
+				}
+
+			} else {
+				log.Println("Invalid input: Country is already registered")
+				return
+			}
+
 		}
 	}
-
 }
 
 // Functon to handle country and or isocode accordingly
@@ -99,83 +116,83 @@ func handleValidCountryAndCode(w http.ResponseWriter, s utils.Registration) (str
 	// Empty slice to hold the data from requested country
 	var apiInfo []utils.CountryInfo
 
+	// Variables for response body and error
 	var res *http.Response
 	var err error
 
-	// Fetch URL depending on which field has been filled and are valid, if both are, use the country value
+	// Fetch countries URL depending on which field has been filled and are valid.
 	if country != "" || isocode != "" {
-		// HEAD request to check if the country field is valid without doing a GET request
-		res, err = http.Head(utils.COUNTRIES_API_NAME + country)
+
+		// HEAD request to the countries API endpoint via country input
+		url := utils.COUNTRIES_API_NAME + country
+		res, err = http.Head(url)
 		if err != nil {
-			log.Println("The country field is an invalid path for the URL")
-			http.Error(w, "Invalid country URL, checking for ISOCODE", http.StatusContinue)
+			log.Println("Invalid URL: Invalid country input ", err)
 		}
-		// if the HEAD request is OK, GET the country info URL by country name
+
+		// Check if the response status code is OK, then GET the URL body
 		if res.StatusCode == http.StatusOK {
-			http.Error(w, "valid country using country for registration", http.StatusContinue)
-			log.Println(utils.COUNTRIES_API_NAME + country)
-			res, err = http.Get(utils.COUNTRIES_API_NAME + country)
+			log.Println("Valid 'countries' URL with country: Processing")
+			res, err = http.Get(url)
 
-		} else { // if the country value is invalid, check the isocode value
-			log.Println("URL for country is not reachable")
+		} else { // if the country input is invalid, check the isocode input
 
-			// Make a HEAD request to check if the isocode field is valid without doing a GET request
-			res, err = http.Head(utils.COUNTRIES_API_ISOCODE + isocode)
+			// HEAD request to the countries API endpoint via isocode input
+			url := utils.COUNTRIES_API_ISOCODE + isocode
+			res, err = http.Head(url)
 			if err != nil {
-				log.Println("The isocode field is an invalid path for the URL")
-				http.Error(w, "Invalid isocode for URL", http.StatusBadRequest)
+				log.Println("Invalid URL: Invalid isocode input ", err)
 			}
-			// if the HEAD request is OK, GET the country info URL by isocode
+
+			// Check if the response status code is OK, then GET the URL body
 			if res.StatusCode == http.StatusOK {
-				log.Println(utils.COUNTRIES_API_ISOCODE + isocode)
-				http.Error(w, "valid isocode using ISOCODE for registration", http.StatusContinue)
-				res, err = http.Get(utils.COUNTRIES_API_ISOCODE + isocode)
-			} else {
-				log.Println("URL for isocode is not reachable")
-				http.Error(w, "Invalid isocode and or country code", http.StatusBadRequest)
+				log.Println("Valid 'countries' URL with isocode: Processing")
+				res, err = http.Get(url)
 			}
 		}
 	}
-
 	// Check if country info URL is valid
 	if err != nil {
-		http.Error(w, "Failed to fetch country info", http.StatusInternalServerError)
-		log.Println("Failed to fetch country info:", err)
+		log.Println("Error: Failed to fetch country info from URL: ", err)
+		http.Error(w, "Error: Failed to fetch country info from URL", http.StatusInternalServerError)
 		return "", "", err
 	}
 
 	// Decode the response
 	if err := json.NewDecoder(res.Body).Decode(&apiInfo); err != nil {
-		http.Error(w, "Failed to decode country info", http.StatusInternalServerError)
-		log.Println("Failed to decode country info:", err)
+		log.Println("Error: decoding JSON", err)
 		return "", "", err
 	}
 
-	// Check if the country name or ISO code is valid or empty, handle accordingly
+	// Handle when either the country or isocode input is a valid value matching the API's value
 	if strings.ToUpper(country) == strings.ToUpper(apiInfo[0].Name.Common) {
-		// Makes sure that even if the ISO code field is empty/ invalid, it get corrected to fit with the valid country value
+		// Making sure that empty/ invalid isocode field is returned with the matching isocode from the country input
 		if isocode != "" || isocode == "" {
-			http.Error(w, "Valid country name input: "+apiInfo[0].Isocode+" and "+apiInfo[0].Name.Common+" has be registered", http.StatusBadRequest)
 			return apiInfo[0].Isocode, apiInfo[0].Name.Common, nil
 		}
 	} else {
-		log.Println("invalid country input did not pass")
+		log.Println("Invalid value: Field 'country': " + country + ", does not match " + apiInfo[0].Name.Common + " found")
+		http.Error(w, "Invalid value: Field 'country' or 'isocode'", http.StatusBadRequest)
+		return "", "", nil
+
 	}
 
-	// Makes sure that even if the country field is empty/ invalid, it get corrected to fit with the valid ISO code value
+	// Making sure that empty/ invalid country field is returned with the matching country from the isocode input
 	if strings.ToUpper(isocode) == apiInfo[0].Isocode {
 		if country != "" || country == "" {
-			http.Error(w, "Valid isocode input: "+apiInfo[0].Isocode+" and "+apiInfo[0].Name.Common+" will be registered", http.StatusBadRequest)
 			return apiInfo[0].Isocode, apiInfo[0].Name.Common, nil
 
 		}
 	} else {
-		log.Println("invalid isocode did not pass")
+		log.Println("Invalid value: Field 'isocode': " + isocode + ", does not match" + apiInfo[0].Isocode + "found")
+		http.Error(w, "Invalid value: Field 'country' or 'isocode'", http.StatusBadRequest)
+		return "", "", nil
+
 	}
 
 	// If no match found
-	http.Error(w, "Invalid country or ISO code", http.StatusBadRequest)
-	log.Println("Invalid country or ISO code")
+	http.Error(w, "Invalid input: Field 'country' and or 'isocode'", http.StatusBadRequest)
+	log.Println("Invalid input: Field 'country' and or 'isocode'")
 	return "", "", nil
 }
 
@@ -193,14 +210,67 @@ func checkCountryExists(ctx context.Context, client *firestore.Client, w http.Re
 	doc, err := iter.Next()
 	if err == iterator.Done {
 		// No more documents
-		log.Println("Country: " + country + " does not exist")
-		http.Error(w, "Country: "+country+" does not exist", http.StatusContinue)
+		log.Println("Country: " + country + " does not exist in Firestore database")
 		return false, nil
+	} else {
+		// Document found with the specified field value, returning the document ID
+		log.Println("Country: " + country + " already exists in Firestore database with ID: " + doc.Ref.ID)
+		http.Error(w, "Invalid input: "+country+" already exists in document with ID: "+doc.Ref.ID+
+			".\n Suggestion: Use 'UPDATE' or 'PUT' to change pre-existing dashboards", http.StatusConflict)
+		return true, nil
+	}
+}
+
+// Functon to check valid currencies accordingly
+func checkValidCurrencies(w http.ResponseWriter, s utils.Registration) (bool, error) {
+
+	// Currencies from client input
+	currencies := s.Features.TargetCurrencies
+
+	// Initialize an empty hashmap of string-struct pairs
+	uniqueCurrencies := make(map[string]struct{})
+
+	// Construct a new slice that will only contain unique currencies
+	uniqueCurrenciesSlice := make([]string, 0, len(currencies))
+
+	// iterate through the currnecies array to remove duplicates
+	for _, currency := range s.Features.TargetCurrencies {
+		// Skip empty strings
+		if currency == "" {
+			continue
+		}
+		// Check if the currency is already present in the map
+		if _, found := uniqueCurrencies[currency]; !found {
+			// If not found, add the currency to the map and slice
+			uniqueCurrencies[currency] = struct{}{}
+			uniqueCurrenciesSlice = append(uniqueCurrenciesSlice, currency)
+		}
+	}
+	log.Println("All possible duplicates, if any, has been removed from", currencies, " to ", uniqueCurrenciesSlice)
+
+	// Iterate through each currency and see if they are valid
+	for _, currency := range uniqueCurrenciesSlice {
+
+		url := utils.CURRENCY_API + currency
+
+		// Send a Get request to the currency API endpoint
+		res, err := http.Get(url)
+		if err != nil {
+			// Handle error if the request fails
+			log.Println("Error: checking currency validity. ", err)
+			http.Error(w, "Error: checking currency validity", http.StatusInternalServerError)
+			return false, err
+		}
+
+		// Check if the response status code is OK
+		if res.StatusCode == http.StatusOK {
+			log.Println("Valid currency:", currency)
+		} else { // return false when encountering invalid currency
+			log.Println("Invalid currency:", currency)
+			return false, nil
+		}
 	}
 
-	// Document found with the specified field value
-	log.Println("Country: " + country + " already exists")
-	http.Error(w, "Country: "+country+" exists in document with ID: "+doc.Ref.ID, http.StatusBadRequest)
 	return true, nil
 }
 
