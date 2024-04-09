@@ -14,10 +14,8 @@ func TestStatusHandler(t *testing.T) {
 	// Initialize handler instance
 	handlerStatus := StatusHandler
 
-	// Set up infrastructure to be used for invocation - important: wrap handler function in http.HandlerFunc()
+	// Set up infrastructure to be used for invocation)
 	server := httptest.NewServer(http.HandlerFunc(handlerStatus))
-
-	// Ensure it is torn down properly at the end
 	defer server.Close()
 
 	// Create client instance
@@ -32,19 +30,18 @@ func TestStatusHandler(t *testing.T) {
 		t.Fatal("Get request to URL failed:", err.Error())
 	}
 
+	// Decode JSON response body into a status struct
 	var s utils.Status
 	err2 := json.NewDecoder(res.Body).Decode(&s)
 	if err2 != nil {
 		t.Fatal("Error during decoding:", err2.Error())
 	}
 
-	// Additional test cases using the ResponseRecorder approach
 	// Mocking the start time for testing purposes
 	startTime = time.Now()
 
 	// Mock the external API calls using httptest.NewServer
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Simulate API responses based on your handler's logic
 		if r.URL.String() == utils.COUNTRIES_API+"/name/norway" {
 			w.WriteHeader(http.StatusOK)
 		} else if r.URL.String() == utils.GEOCODING_API+"Norway&count=1&language=en&format=json" {
@@ -57,6 +54,7 @@ func TestStatusHandler(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
+
 	// Close the mock server when the test ends
 	defer mockServer.Close()
 
@@ -81,4 +79,10 @@ func TestStatusHandler(t *testing.T) {
 	if err3 != nil {
 		t.Errorf("error unmarshalling JSON response: %v", err3)
 	}
+
+	// Check if there is no error returned from StatusHandler
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("unexpected status code returned by StatusHandler: %v", status)
+	}
+
 }
