@@ -4,10 +4,11 @@ import (
 	structs "assignment2/utils"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 var webhooks = []structs.WebhookRegistration{}
@@ -19,32 +20,8 @@ func NotificationHandler(w http.ResponseWriter, r *http.Request) {
 	id := urlParts[len(urlParts)-1]
 
 	switch r.Method {
-	case http.MethodPost:
-		webhook := structs.WebhookRegistration{}
-		err := json.NewDecoder(r.Body).Decode(&webhook)
-		if err != nil {
-			http.Error(w, "Something went wrong"+err.Error(), http.StatusBadRequest)
-		}
-		if webhook.Event == "REGISTER" {
-			// Firebase for å lage persistent storage
-			webhooks = append(webhooks, webhook)
-			id := uuid.New()
-			fmt.Println("ID: " + id.String())
-
-			idStruct := structs.WebhookRegistrationResponse{
-				Id: id.String(),
-			}
-
-			response, err := json.Marshal(idStruct)
-			if err != nil {
-				// error
-			}
-
-			log.Println("Webhook " + webhook.Url + " has been registered")
-
-			http.Error(w, string(response), http.StatusCreated)
-
-		}
+	case http.MethodPost: //registration of webhooks
+		RegisterWebhook(r, w)
 
 	case http.MethodDelete:
 		println("Delete " + id)
@@ -68,7 +45,8 @@ func NotificationHandler(w http.ResponseWriter, r *http.Request) {
 
 			response, err := json.Marshal(getAllNotifications)
 			if err != nil {
-				// error
+				fmt.Println("Error:", err)
+				return
 			}
 			http.Error(w, string(response), http.StatusOK)
 
@@ -83,6 +61,36 @@ func NotificationHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Adds new webhook registration to firebase
+func RegisterWebhook(r *http.Request, w http.ResponseWriter) {
+	webhook := structs.WebhookRegistration{}
+	err := json.NewDecoder(r.Body).Decode(&webhook)
+	if err != nil {
+		http.Error(w, "Something went wrong"+err.Error(), http.StatusBadRequest)
+	}
+	if webhook.Event == "REGISTER" {
+
+		webhooks = append(webhooks, webhook)
+		id := uuid.New()
+		fmt.Println("ID: " + id.String())
+
+		idStruct := structs.WebhookRegistrationResponse{
+			Id: id.String(),
+		}
+
+		response, err := json.Marshal(idStruct)
+		if err != nil {
+			http.Error(w, "Something went wrong"+err.Error(), http.StatusBadRequest)
+
+		}
+
+		log.Println("Webhook " + webhook.Url + " has been registered")
+
+		http.Error(w, string(response), http.StatusCreated)
+
+	}
+}
+
 func createWebhookResponse(id string, url string) []byte {
 	getStruct := structs.WebhookGetResponse{
 		Id:      id,
@@ -93,7 +101,8 @@ func createWebhookResponse(id string, url string) []byte {
 
 	response, err := json.Marshal(getStruct)
 	if err != nil {
-		// error
+		var errorResponse []byte = nil
+		return errorResponse
 	}
 	return response
 }

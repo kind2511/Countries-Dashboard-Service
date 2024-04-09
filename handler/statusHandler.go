@@ -23,8 +23,8 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Gets status-code for Meteo API (can be changed to its const)
-	meteoApiStatusCode, err := http.Get("https://geocoding-api.open-meteo.com/v1/search?name=Norway&count=1&language=en&format=json")
+	// Gets status-code for Meteo API
+	meteoApiStatusCode, err := http.Get(utils.GEOCODING_API + "Norway&count=1&language=en&format=json")
 	if err != nil {
 		err = fmt.Errorf("error occured while making HTTP request: %v", err)
 		fmt.Println(err)
@@ -39,12 +39,19 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	notificationStatus, err := http.Get("https://console.firebase.google.com/project/prog2005-assignment2-ee93a/firestore/databases/-default-/data/~2FDashboard~2FXhjRXlZcd7uLTMd8kdxb")
+	if err != nil {
+		err = fmt.Errorf("error occured while making HTTP request: %v", err)
+		fmt.Println(err)
+		return
+	}
+
 	// Creates status struct (hardcoded now)
 	Status := utils.Status{
 		Countriesapi:   countriesApiStatusCode.StatusCode,
 		Meteoapi:       meteoApiStatusCode.StatusCode,
 		Currencyapi:    currencyApiStatusCode.StatusCode,
-		Notificationdb: 1,
+		Notificationdb: notificationStatus.StatusCode,
 		Webhooks:       1,
 		Version:        "v1",
 		Uptime:         upTime,
