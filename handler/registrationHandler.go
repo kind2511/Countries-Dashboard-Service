@@ -62,7 +62,7 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 	// Decode registration instance
 	err := decoder.Decode(&dashboard)
 	if err != nil {
-		log.Println("Error: decoding JSON", err)
+		log.Println("Error: decoding JSON into Dashboard struct due to ", err)
 		http.Error(w, "Error: decoding JSON, Invalid inputs "+err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -76,8 +76,7 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 	} else { // Validate country and isocode fields
 		validIsocode, validCountry, err := handleValidCountryAndCode(w, dashboard)
 		if err != nil {
-			log.Println("Invalid input: Fields 'Country' and or 'Isocode'", err)
-			http.Error(w, "Invalid input: Fields 'Country' and or 'Isocode'", http.StatusBadRequest)
+			log.Println(w, "Invalid input: Fields 'Country' and or 'Isocode'")
 			return
 		}
 
@@ -133,31 +132,29 @@ func handleValidCountryAndCode(w http.ResponseWriter, s utils.Dashboard) (string
 		// HEAD request to the countries API endpoint via country input
 		url := utils.COUNTRIES_API_NAME + country
 		res, err = http.Head(url)
-		if err != nil {
-			log.Println("Invalid URL: Invalid country input ", err)
-		}
 
 		// Check if the response status code is OK, then GET the URL body
 		if res.StatusCode == http.StatusOK {
-			log.Println("Valid 'countries' URL with country: Processing")
+			log.Println("Valid 'countries' URL with country input: " + country + "...processing")
 			res, err = http.Get(url)
 
 		} else { // if the country input is invalid, check the isocode input
+			log.Println("Invalid input: URL unreachable with 'country': "+country+". Checking 'isocode': "+isocode, err)
 
 			// HEAD request to the countries API endpoint via isocode input
 			url := utils.COUNTRIES_API_ISOCODE + isocode
 			res, err = http.Head(url)
-			if err != nil {
-				log.Println("Invalid URL: Invalid isocode input ", err)
-			}
 
 			// Check if the response status code is OK, then GET the URL body
 			if res.StatusCode == http.StatusOK {
-				log.Println("Valid 'countries' URL with isocode: Processing")
+				log.Println("Valid 'countries' URL with isocode input: " + isocode + "...processing")
 				res, err = http.Get(url)
+			} else {
+				log.Println("Invalid input: URL unreachable with 'isocode': "+isocode+" or 'country': "+country, err)
 			}
 		}
 	}
+
 	// Check if country info URL is valid
 	if err != nil {
 		log.Println("Error: Failed to fetch country info from URL: ", err)
@@ -167,7 +164,8 @@ func handleValidCountryAndCode(w http.ResponseWriter, s utils.Dashboard) (string
 
 	// Decode the response
 	if err := json.NewDecoder(res.Body).Decode(&apiInfo); err != nil {
-		log.Println("Error: decoding JSON", err)
+		log.Println("Error: decoding JSON from countries URL", err)
+		http.Error(w, "Error: decoding JSON "+err.Error(), http.StatusBadRequest)
 		return "", "", err
 	}
 
@@ -179,27 +177,22 @@ func handleValidCountryAndCode(w http.ResponseWriter, s utils.Dashboard) (string
 		}
 	} else {
 		log.Println("Invalid value: Field 'country': " + country + ", does not match " + apiInfo[0].Name.Common + " found")
-		http.Error(w, "Invalid value: Field 'country' or 'isocode'", http.StatusBadRequest)
-		return "", "", nil
 
-	}
+		// Making sure that empty/ invalid country field is returned with the matching country from the isocode input
+		if strings.ToUpper(isocode) == apiInfo[0].Isocode {
+			if country != "" || country == "" {
+				return apiInfo[0].Isocode, apiInfo[0].Name.Common, nil
 
-	// Making sure that empty/ invalid country field is returned with the matching country from the isocode input
-	if strings.ToUpper(isocode) == apiInfo[0].Isocode {
-		if country != "" || country == "" {
-			return apiInfo[0].Isocode, apiInfo[0].Name.Common, nil
+			}
+		} else {
+			log.Println("Invalid value: Field 'isocode': " + isocode + ", does not match" + apiInfo[0].Isocode + "found")
+			return "", "", nil
 
 		}
-	} else {
-		log.Println("Invalid value: Field 'isocode': " + isocode + ", does not match" + apiInfo[0].Isocode + "found")
-		http.Error(w, "Invalid value: Field 'country' or 'isocode'", http.StatusBadRequest)
-		return "", "", nil
-
 	}
 
 	// If no match found
 	http.Error(w, "Invalid input: Field 'country' and or 'isocode'", http.StatusBadRequest)
-	log.Println("Invalid input: Field 'country' and or 'isocode'")
 	return "", "", nil
 }
 
@@ -211,14 +204,19 @@ func checkValidCurrencies(w http.ResponseWriter, d utils.Dashboard) ([]string, e
 	// Currencies from client input
 	currencies := d.RegFeatures.TargetCurrencies
 
+	// Convert each currency to uppercase
+	for i, currency := range currencies {
+		currencies[i] = strings.ToUpper(currency)
+	}
+
 	// Initialize an empty hashmap of string-struct pairs
 	uniqueCurrencies := make(map[string]struct{})
 
 	// Construct a new slice that will only contain unique currencies
 	uniqueCurrenciesSlice := make([]string, 0, len(currencies))
 
-	// iterate through the currnecies array to remove duplicates
-	for _, currency := range d.RegFeatures.TargetCurrencies {
+	// iterate through the currnecies array to remove possible duplicates
+	for _, currency := range currencies {
 		// Skip empty strings
 		if currency == "" {
 			continue
@@ -230,7 +228,7 @@ func checkValidCurrencies(w http.ResponseWriter, d utils.Dashboard) ([]string, e
 			uniqueCurrenciesSlice = append(uniqueCurrenciesSlice, currency)
 		}
 	}
-	log.Println("All possible duplicates, if any, has been removed from", currencies, " to ", uniqueCurrenciesSlice)
+	log.Println("All possible duplicates, if any, has been removed. From", currencies, " to ", uniqueCurrenciesSlice)
 
 	// Iterate through each currency and see if they are valid
 	for _, currency := range uniqueCurrenciesSlice {
@@ -248,13 +246,13 @@ func checkValidCurrencies(w http.ResponseWriter, d utils.Dashboard) ([]string, e
 
 		// Check if the response status code is OK
 		if res.StatusCode == http.StatusOK {
-			log.Println("Valid currency:", currency)
-		} else { // return false when encountering invalid currency
+			//log.Println("Valid currency:", currency)
+		} else {
 			log.Println("Invalid currency:", currency)
 			return nil, err
 		}
 	}
-
+	// if all currencies are valid, return the values
 	return uniqueCurrenciesSlice, nil
 }
 
@@ -265,9 +263,35 @@ func handlePostRegistration(w http.ResponseWriter, d utils.Dashboard) {
 	// Current formatted time
 	timeNow := whatTimeNow2()
 
+	// Generate a random ID
+	var uniqueID string
+
+	for {
+		uniqueID = utils.GenerateUID(5)
+
+		// Check if the generated ID already exists in a document
+		iter := client.Collection(collection).Where("id", "==", uniqueID).Limit(1).Documents(ctx)
+
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			// No document found with current ID, continue with further processing
+			break
+		}
+		if err != nil {
+			log.Println("Error retrieving document:", err)
+			break
+		}
+		if doc != nil {
+			// ID already exists, generating a new one
+			log.Println("ID already exists...generating new one")
+			continue
+		}
+	}
+
 	// Add the decoded date into Firestore
-	id, _, err := client.Collection(collection).Add(ctx,
+	_, _, err := client.Collection(collection).Add(ctx,
 		map[string]interface{}{
+			"id":      uniqueID,
 			"country": d.Country,
 			"isoCode": d.Isocode,
 			"features": map[string]interface{}{
@@ -281,16 +305,16 @@ func handlePostRegistration(w http.ResponseWriter, d utils.Dashboard) {
 			},
 			"lastChanged": timeNow,
 		})
-	// Return the associated ID and when the configuration was last changed if the configuration was registered successfully
+	//
 	if err != nil {
 		http.Error(w, "Failed to add document to Firestore", http.StatusInternalServerError)
 		log.Println("Failed to add document to Firestore:", err)
 		return
 	} else {
 
-		// Returns document ID and time last updated in body
+		// Returns document ID and time last updated in body if the configuration was registered successfully
 		response := utils.DashboardResponse{
-			ID:         id.ID,
+			ID:         uniqueID,
 			LastChange: timeNow,
 		}
 
@@ -308,7 +332,7 @@ func handlePostRegistration(w http.ResponseWriter, d utils.Dashboard) {
 		w.WriteHeader(http.StatusCreated)
 		w.Write(responseJSON)
 
-		log.Println("Document added to collection. Identifier of return document: ", id.ID)
+		log.Println("Document added to collection. Identifier of return document: ", uniqueID)
 		return
 	}
 }
