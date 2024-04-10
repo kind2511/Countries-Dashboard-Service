@@ -89,3 +89,4 @@ type Registration struct {
 	Features   Features `json:"features"`
 	LastChange string   `json:"lastChange"`
 }
+

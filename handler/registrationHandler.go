@@ -428,6 +428,12 @@ func getDashboards(w http.ResponseWriter, r *http.Request) {
 func deleteDashboard(w http.ResponseWriter, r *http.Request) {
 	// Extract dashboard ID from URL
 	elem := strings.Split(r.URL.Path, "/")
+
+	if len(elem) < 5 {
+		http.Error(w, "Dashboard ID not provided", http.StatusBadRequest)
+		return
+	}
+
 	dashboardID := elem[4]
 
 	if len(dashboardID) != 0 {
