@@ -64,20 +64,20 @@ type WebhookGetResponse struct {
 }
 
 type Firestore struct {
-	Country    string   `json:"country"`
-	Features   Features `json:"features"`
-	IsoCode    string   `json:"isoCode"`
+	Country    string    `json:"country"`
+	Features   Features  `json:"features"`
+	IsoCode    string    `json:"isoCode"`
 	LastChange time.Time `json:"lastChange"`
 }
 
 type Features struct {
-    Temperature      bool     `json:"temperature"`
-    Precipitation    bool     `json:"precipitation"`
-    Capital          bool     `json:"capital"`
-    Coordinates      bool     `json:"coordinates"`
-    Population       bool     `json:"population"`
-    Area             bool     `json:"area"`
-    TargetCurrencies []string `json:"targetCurrencies"`
+	Temperature      bool     `json:"temperature"`
+	Precipitation    bool     `json:"precipitation"`
+	Capital          bool     `json:"capital"`
+	Coordinates      bool     `json:"coordinates"`
+	Population       bool     `json:"population"`
+	Area             bool     `json:"area"`
+	TargetCurrencies []string `json:"targetCurrencies"`
 }
 
 // Desired document structure
@@ -87,4 +87,11 @@ type Registration struct {
 	IsoCode    string   `json:"isoCode"`
 	Features   Features `json:"features"`
 	LastChange string   `json:"lastChange"`
+}
+
+// Desired output for default handler
+type DefaultEndpointStruct struct {
+	Url         string `json:"url"`
+	Method      string `json:"method"`
+	Description string `json:"description"`
 }
