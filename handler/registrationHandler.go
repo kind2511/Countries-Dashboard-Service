@@ -12,6 +12,8 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"google.golang.org/api/iterator"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // Firebase context and client used by Firestore functions throughout the program.
@@ -36,6 +38,10 @@ func RegistrationHandler(w http.ResponseWriter, r *http.Request) {
 		postRegistration(w, r)
 	case http.MethodGet:
 		getDashboards(w, r)
+	case http.MethodPut:
+		updateDashboard(w, r, true)
+	case http.MethodPatch:
+		updateDashboard(w, r, false)
 	case http.MethodDelete:
 		deleteDashboard(w, r)
 	default:
@@ -62,7 +68,7 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 	// Decode registration instance
 	err := decoder.Decode(&dashboard)
 	if err != nil {
-		log.Println("Error: decoding JSON", err)
+		log.Println("Error: decoding JSON into Dashboard struct due to ", err)
 		http.Error(w, "Error: decoding JSON, Invalid inputs "+err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -76,8 +82,7 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 	} else { // Validate country and isocode fields
 		validIsocode, validCountry, err := handleValidCountryAndCode(w, dashboard)
 		if err != nil {
-			log.Println("Invalid input: Fields 'Country' and or 'Isocode'", err)
-			http.Error(w, "Invalid input: Fields 'Country' and or 'Isocode'", http.StatusBadRequest)
+			log.Println(w, "Invalid input: Fields 'Country' and or 'Isocode'")
 			return
 		}
 
@@ -133,31 +138,29 @@ func handleValidCountryAndCode(w http.ResponseWriter, s utils.Dashboard) (string
 		// HEAD request to the countries API endpoint via country input
 		url := utils.COUNTRIES_API_NAME + country
 		res, err = http.Head(url)
-		if err != nil {
-			log.Println("Invalid URL: Invalid country input ", err)
-		}
 
 		// Check if the response status code is OK, then GET the URL body
 		if res.StatusCode == http.StatusOK {
-			log.Println("Valid 'countries' URL with country: Processing")
+			log.Println("Valid 'countries' URL with country input: " + country + "...processing")
 			res, err = http.Get(url)
 
 		} else { // if the country input is invalid, check the isocode input
+			log.Println("Invalid input: URL unreachable with 'country': "+country+". Checking 'isocode': "+isocode, err)
 
 			// HEAD request to the countries API endpoint via isocode input
 			url := utils.COUNTRIES_API_ISOCODE + isocode
 			res, err = http.Head(url)
-			if err != nil {
-				log.Println("Invalid URL: Invalid isocode input ", err)
-			}
 
 			// Check if the response status code is OK, then GET the URL body
 			if res.StatusCode == http.StatusOK {
-				log.Println("Valid 'countries' URL with isocode: Processing")
+				log.Println("Valid 'countries' URL with isocode input: " + isocode + "...processing")
 				res, err = http.Get(url)
+			} else {
+				log.Println("Invalid input: URL unreachable with 'isocode': "+isocode+" or 'country': "+country, err)
 			}
 		}
 	}
+
 	// Check if country info URL is valid
 	if err != nil {
 		log.Println("Error: Failed to fetch country info from URL: ", err)
@@ -167,7 +170,8 @@ func handleValidCountryAndCode(w http.ResponseWriter, s utils.Dashboard) (string
 
 	// Decode the response
 	if err := json.NewDecoder(res.Body).Decode(&apiInfo); err != nil {
-		log.Println("Error: decoding JSON", err)
+		log.Println("Error: decoding JSON from countries URL", err)
+		http.Error(w, "Error: decoding JSON "+err.Error(), http.StatusBadRequest)
 		return "", "", err
 	}
 
@@ -179,27 +183,22 @@ func handleValidCountryAndCode(w http.ResponseWriter, s utils.Dashboard) (string
 		}
 	} else {
 		log.Println("Invalid value: Field 'country': " + country + ", does not match " + apiInfo[0].Name.Common + " found")
-		http.Error(w, "Invalid value: Field 'country' or 'isocode'", http.StatusBadRequest)
-		return "", "", nil
 
-	}
+		// Making sure that empty/ invalid country field is returned with the matching country from the isocode input
+		if strings.ToUpper(isocode) == apiInfo[0].Isocode {
+			if country != "" || country == "" {
+				return apiInfo[0].Isocode, apiInfo[0].Name.Common, nil
 
-	// Making sure that empty/ invalid country field is returned with the matching country from the isocode input
-	if strings.ToUpper(isocode) == apiInfo[0].Isocode {
-		if country != "" || country == "" {
-			return apiInfo[0].Isocode, apiInfo[0].Name.Common, nil
+			}
+		} else {
+			log.Println("Invalid value: Field 'isocode': " + isocode + ", does not match" + apiInfo[0].Isocode + "found")
+			return "", "", nil
 
 		}
-	} else {
-		log.Println("Invalid value: Field 'isocode': " + isocode + ", does not match" + apiInfo[0].Isocode + "found")
-		http.Error(w, "Invalid value: Field 'country' or 'isocode'", http.StatusBadRequest)
-		return "", "", nil
-
 	}
 
 	// If no match found
 	http.Error(w, "Invalid input: Field 'country' and or 'isocode'", http.StatusBadRequest)
-	log.Println("Invalid input: Field 'country' and or 'isocode'")
 	return "", "", nil
 }
 
@@ -211,14 +210,19 @@ func checkValidCurrencies(w http.ResponseWriter, d utils.Dashboard) ([]string, e
 	// Currencies from client input
 	currencies := d.RegFeatures.TargetCurrencies
 
+	// Convert each currency to uppercase
+	for i, currency := range currencies {
+		currencies[i] = strings.ToUpper(currency)
+	}
+
 	// Initialize an empty hashmap of string-struct pairs
 	uniqueCurrencies := make(map[string]struct{})
 
 	// Construct a new slice that will only contain unique currencies
 	uniqueCurrenciesSlice := make([]string, 0, len(currencies))
 
-	// iterate through the currnecies array to remove duplicates
-	for _, currency := range d.RegFeatures.TargetCurrencies {
+	// iterate through the currnecies array to remove possible duplicates
+	for _, currency := range currencies {
 		// Skip empty strings
 		if currency == "" {
 			continue
@@ -230,7 +234,7 @@ func checkValidCurrencies(w http.ResponseWriter, d utils.Dashboard) ([]string, e
 			uniqueCurrenciesSlice = append(uniqueCurrenciesSlice, currency)
 		}
 	}
-	log.Println("All possible duplicates, if any, has been removed from", currencies, " to ", uniqueCurrenciesSlice)
+	log.Println("All possible duplicates, if any, has been removed. From", currencies, " to ", uniqueCurrenciesSlice)
 
 	// Iterate through each currency and see if they are valid
 	for _, currency := range uniqueCurrenciesSlice {
@@ -248,13 +252,13 @@ func checkValidCurrencies(w http.ResponseWriter, d utils.Dashboard) ([]string, e
 
 		// Check if the response status code is OK
 		if res.StatusCode == http.StatusOK {
-			log.Println("Valid currency:", currency)
-		} else { // return false when encountering invalid currency
+			//log.Println("Valid currency:", currency)
+		} else {
 			log.Println("Invalid currency:", currency)
 			return nil, err
 		}
 	}
-
+	// if all currencies are valid, return the values
 	return uniqueCurrenciesSlice, nil
 }
 
@@ -265,9 +269,35 @@ func handlePostRegistration(w http.ResponseWriter, d utils.Dashboard) {
 	// Current formatted time
 	timeNow := whatTimeNow2()
 
+	// Generate a random ID
+	var uniqueID string
+
+	for {
+		uniqueID = utils.GenerateUID(5)
+
+		// Check if the generated ID already exists in a document
+		iter := client.Collection(collection).Where("id", "==", uniqueID).Limit(1).Documents(ctx)
+
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			// No document found with current ID, continue with further processing
+			break
+		}
+		if err != nil {
+			log.Println("Error retrieving document:", err)
+			break
+		}
+		if doc != nil {
+			// ID already exists, generating a new one
+			log.Println("ID already exists...generating new one")
+			continue
+		}
+	}
+
 	// Add the decoded date into Firestore
-	id, _, err := client.Collection(collection).Add(ctx,
+	_, _, err := client.Collection(collection).Add(ctx,
 		map[string]interface{}{
+			"id":      uniqueID,
 			"country": d.Country,
 			"isoCode": d.Isocode,
 			"features": map[string]interface{}{
@@ -281,16 +311,16 @@ func handlePostRegistration(w http.ResponseWriter, d utils.Dashboard) {
 			},
 			"lastChanged": timeNow,
 		})
-	// Return the associated ID and when the configuration was last changed if the configuration was registered successfully
+	//
 	if err != nil {
 		http.Error(w, "Failed to add document to Firestore", http.StatusInternalServerError)
 		log.Println("Failed to add document to Firestore:", err)
 		return
 	} else {
 
-		// Returns document ID and time last updated in body
+		// Returns document ID and time last updated in body if the configuration was registered successfully
 		response := utils.DashboardResponse{
-			ID:         id.ID,
+			ID:         uniqueID,
 			LastChange: timeNow,
 		}
 
@@ -308,7 +338,7 @@ func handlePostRegistration(w http.ResponseWriter, d utils.Dashboard) {
 		w.WriteHeader(http.StatusCreated)
 		w.Write(responseJSON)
 
-		log.Println("Document added to collection. Identifier of return document: ", id.ID)
+		log.Println("Document added to collection. Identifier of return document: ", uniqueID)
 		return
 	}
 }
@@ -466,4 +496,194 @@ func deleteDashboard(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Dashboard ID not provided", http.StatusBadRequest)
 		return
 	}
+}
+
+// Checks if a value is empty, returns true if it is
+func isEmptyField(value interface{}) bool {
+	switch v := value.(type) {
+	case string:
+		return v == ""
+	case *bool:
+		return v == nil
+	case []string:
+		return len(v) == 0
+	default:
+		return false
+	}
+}
+
+// Function that updates a dashboard. Works as both PUT and PATCH, depending on bool given
+func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
+
+	//Fetching ID from URL
+	myId := r.URL.Path[len(utils.REGISTRATION_PATH):]
+
+	//Creates the object variable, with data stored from the user input
+	var myObject utils.Firestore
+	if err := json.NewDecoder(r.Body).Decode(&myObject); err != nil {
+		return err
+	}
+
+	//Time is set to now
+	myObject.LastChange = time.Now()
+
+	//Reference to the document with specified id (will be changed later)
+	docRef := client.Collection(collection).Doc(myId)
+
+	//If the user puts in PUT request
+	if isPut {
+		var p utils.Firestore
+		//Checks for missing elements from user input
+		_, checkIfMissingElements, missingElements := updatedData(&p, &myObject)
+		if checkIfMissingElements {
+			http.Error(w, "Missing variables: "+strings.Join(missingElements, ", "), http.StatusBadRequest)
+			return nil
+		}
+
+		var c []utils.CountryInfo
+		err1 := fetchURLdata(utils.COUNTRIES_API_NAME+myObject.Country, w, &c)
+		if err1 != nil {
+			http.Error(w, "Failed to retrieve country: "+myObject.Country, http.StatusBadRequest)
+			return nil
+		}
+		if myObject.IsoCode != c[0].Isocode {
+			myObject.IsoCode = c[0].Isocode
+		}
+
+		//taking the data from the object and applies them to a map
+		data := map[string]interface{}{
+			"country": myObject.Country,
+			"isoCode": myObject.IsoCode,
+			"features": map[string]interface{}{
+				"temperature":      myObject.Features.Temperature,
+				"precipitation":    myObject.Features.Precipitation,
+				"capital":          myObject.Features.Capital,
+				"coordinates":      myObject.Features.Coordinates,
+				"population":       myObject.Features.Population,
+				"area":             myObject.Features.Area,
+				"targetCurrencies": myObject.Features.TargetCurrencies,
+			},
+			"lastChange": time.Now(),
+		}
+		//Updates the document with the map
+		_, err := docRef.Set(ctx, data)
+		if err != nil {
+			//If document does not exist, it creates a new one
+			if status.Code(err) == codes.NotFound {
+				_, err = docRef.Create(ctx, data)
+				if err != nil {
+					http.Error(w, "failed to create document", http.StatusInternalServerError)
+					return nil
+				}
+				//Else, there is something else wrong with it
+			} else {
+				http.Error(w, "failed to update data", http.StatusInternalServerError)
+				return nil
+			}
+		}
+
+		//If user put in a PATCH request
+	} else {
+		//Fetching the document, checks if it exists
+		doc, err := docRef.Get(ctx)
+		if err != nil {
+			if status.Code(err) == codes.NotFound {
+				http.Error(w, "Document does not exist, cannot PATCH", http.StatusBadRequest)
+				return nil
+			}
+		}
+		//Creates a new object, that fetches data from firebase
+		var newObject utils.Firestore
+		doc.DataTo(&newObject)
+
+		//Merges the data from firebase with user input (that has been written)
+		final, _, _ := updatedData(&newObject, &myObject)
+
+		//Updates the document
+		_, err = docRef.Set(ctx, map[string]interface{}{
+			"country": final.Country,
+			"isoCode": final.IsoCode,
+			"features": map[string]interface{}{
+				"temperature":      final.Features.Temperature,
+				"precipitation":    final.Features.Precipitation,
+				"capital":          final.Features.Capital,
+				"coordinates":      final.Features.Coordinates,
+				"population":       final.Features.Population,
+				"area":             final.Features.Area,
+				"targetCurrencies": final.Features.TargetCurrencies,
+			},
+			"lastChange": time.Now(),
+		})
+		if err != nil {
+			http.Error(w, "Failed to patch", http.StatusInternalServerError)
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Checks for all the elements in the struct if the input by user includes these values.
+// will then replace with only the written in values, avoids multiple null values if they are not written in
+// returns the object with values, a bool to check if values are missing, and a string array containing all
+// names of the missing elements, to inform the user
+func updatedData(newObject *utils.Firestore, myObject *utils.Firestore) (*utils.Firestore, bool, []string) {
+	checkIfMissingElements := false
+	missingElements := make([]string, 0)
+	if !isEmptyField(myObject.Country) {
+		newObject.Country = myObject.Country
+	} else {
+		checkIfMissingElements = true
+		missingElements = append(missingElements, "Country")
+	}
+	if !isEmptyField(myObject.IsoCode) {
+		newObject.IsoCode = myObject.IsoCode
+	} else {
+		checkIfMissingElements = true
+		missingElements = append(missingElements, "IsoCode")
+	}
+	if !isEmptyField(myObject.Features.Area) {
+		newObject.Features.Area = myObject.Features.Area
+	} else {
+		checkIfMissingElements = true
+		missingElements = append(missingElements, "Area")
+	}
+	if !isEmptyField(myObject.Features.Capital) {
+		newObject.Features.Capital = myObject.Features.Capital
+	} else {
+		checkIfMissingElements = true
+		missingElements = append(missingElements, "Capital")
+	}
+	if !isEmptyField(myObject.Features.Coordinates) {
+		newObject.Features.Coordinates = myObject.Features.Coordinates
+	} else {
+		checkIfMissingElements = true
+		missingElements = append(missingElements, "Coordinates")
+	}
+	if !isEmptyField(myObject.Features.Precipitation) {
+		newObject.Features.Precipitation = myObject.Features.Precipitation
+	} else {
+		checkIfMissingElements = true
+		missingElements = append(missingElements, "Precipitation")
+	}
+	if !isEmptyField(myObject.Features.Temperature) {
+		newObject.Features.Temperature = myObject.Features.Temperature
+	} else {
+		checkIfMissingElements = true
+		missingElements = append(missingElements, "Temperature")
+	}
+	if !isEmptyField(myObject.Features.Population) {
+		newObject.Features.Population = myObject.Features.Population
+	} else {
+		checkIfMissingElements = true
+		missingElements = append(missingElements, "Population")
+	}
+	if !isEmptyField(myObject.Features.TargetCurrencies) {
+		newObject.Features.TargetCurrencies = myObject.Features.TargetCurrencies
+	} else {
+		checkIfMissingElements = true
+		missingElements = append(missingElements, "Target Currencies")
+	}
+	return newObject, checkIfMissingElements, missingElements
+
 }

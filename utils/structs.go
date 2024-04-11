@@ -12,13 +12,13 @@ type Dashboard struct {
 }
 
 type RegFeatures struct {
-	Temperature      bool     `json:"temperature, omitempty"` // Note: In degrees Celsius
-	Precipitation    bool     `json:"precipitation, omitempty"`
-	Capital          bool     `json:"capital, omitempty"`
-	Coordinates      bool     `json:"coordinates, omitempty"`
-	Population       bool     `json:"population, omitempty"`
-	Area             bool     `json:"area, omitempty"`
-	TargetCurrencies []string `json:"targetcurrencies, omitempty"`
+	Temperature      bool     `json:"temperature,omitempty"` // Note: In degrees Celsius
+	Precipitation    bool     `json:"precipitation,omitempty"`
+	Capital          bool     `json:"capital,omitempty"`
+	Coordinates      bool     `json:"coordinates,omitempty"`
+	Population       bool     `json:"population,omitempty"`
+	Area             bool     `json:"area,omitempty"`
+	TargetCurrencies []string `json:"targetcurrencies,omitempty"`
 }
 
 // Struct for dashboard registration response
@@ -72,13 +72,13 @@ type Firestore struct {
 }
 
 type Features struct {
-    Temperature      bool     `json:"temperature"`
-    Precipitation    bool     `json:"precipitation"`
-    Capital          bool     `json:"capital"`
-    Coordinates      bool     `json:"coordinates"`
-    Population       bool     `json:"population"`
-    Area             bool     `json:"area"`
-    TargetCurrencies []string `json:"targetCurrencies"`
+	Temperature      *bool    `json:"temperature"`
+	Precipitation    *bool    `json:"precipitation"`
+	Capital          *bool    `json:"capital"`
+	Coordinates      *bool    `json:"coordinates"`
+	Population       *bool    `json:"population"`
+	Area             *bool    `json:"area"`
+	TargetCurrencies []string `json:"targetCurrencies"`
 }
 
 // Desired document structure

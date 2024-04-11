@@ -182,37 +182,6 @@ func DashboardFunc(w http.ResponseWriter, r *http.Request) error {
 		}
 
 	}
-	/*
-		var inputData []Recieved_Dashboard
-
-		//Fetching data from json file, which contains dashboards
-		err := fetchURLdata("test-data.json", false, w, &inputData)
-		if err != nil {
-			return err
-		}
-
-		//Checking and converting the id to int, which will be used for fetching object
-		myIdInt, err := strconv.Atoi(myId)
-		if err != nil {
-			http.Error(w, "'"+myId+"'"+" is not a valid id", http.StatusBadRequest)
-			return err
-		}
-		//Small function that returns object based on matching object Id
-		getObjectByID := func(id int) *Recieved_Dashboard {
-			for _, obj := range inputData {
-				if obj.Id == id {
-					return &obj
-				}
-			}
-			return nil
-		}
-		//Getting object from an id. If nil, error is returned
-		myObject := getObjectByID(myIdInt)
-		if myObject == nil {
-			http.Error(w, "Object with Id "+"'"+myId+"' not found", http.StatusBadRequest)
-			return err
-		}
-	*/
 
 	return nil
 }
