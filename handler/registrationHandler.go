@@ -12,6 +12,8 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"google.golang.org/api/iterator"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // Firebase context and client used by Firestore functions throughout the program.
@@ -36,6 +38,10 @@ func RegistrationHandler(w http.ResponseWriter, r *http.Request) {
 		postRegistration(w, r)
 	case http.MethodGet:
 		getDashboards(w, r)
+	case http.MethodPut:
+		updateDashboard(w, r, true)
+	case http.MethodPatch:
+		updateDashboard(w, r, false)
 	case http.MethodDelete:
 		deleteDashboard(w, r)
 	default:
@@ -458,4 +464,194 @@ func deleteDashboard(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Dashboard ID not provided", http.StatusBadRequest)
 		return
 	}
+}
+
+// Checks if a value is empty, returns true if it is
+func isEmptyField(value interface{}) bool {
+	switch v := value.(type) {
+	case string:
+		return v == ""
+	case *bool:
+		return v == nil
+	case []string:
+		return len(v) == 0
+	default:
+		return false
+	}
+}
+
+// Function that updates a dashboard. Works as both PUT and PATCH, depending on bool given
+func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
+
+	//Fetching ID from URL
+	myId := r.URL.Path[len(utils.REGISTRATION_PATH):]
+
+	//Creates the object variable, with data stored from the user input
+	var myObject utils.Firestore
+	if err := json.NewDecoder(r.Body).Decode(&myObject); err != nil {
+		return err
+	}
+
+	//Time is set to now
+	myObject.LastChange = time.Now()
+
+	//Reference to the document with specified id (will be changed later)
+	docRef := client.Collection(collection).Doc(myId)
+
+	//If the user puts in PUT request
+	if isPut {
+		var p utils.Firestore
+		//Checks for missing elements from user input
+		_, checkIfMissingElements, missingElements := updatedData(&p, &myObject)
+		if checkIfMissingElements {
+			http.Error(w, "Missing variables: "+strings.Join(missingElements, ", "), http.StatusBadRequest)
+			return nil
+		}
+
+		var c []utils.CountryInfo
+		err1 := fetchURLdata(utils.COUNTRIES_API_NAME+myObject.Country, w, &c)
+		if err1 != nil {
+			http.Error(w, "Failed to retrieve country: "+myObject.Country, http.StatusBadRequest)
+			return nil
+		}
+		if myObject.IsoCode != c[0].Isocode {
+			myObject.IsoCode = c[0].Isocode
+		}
+
+		//taking the data from the object and applies them to a map
+		data := map[string]interface{}{
+			"country": myObject.Country,
+			"isoCode": myObject.IsoCode,
+			"features": map[string]interface{}{
+				"temperature":      myObject.Features.Temperature,
+				"precipitation":    myObject.Features.Precipitation,
+				"capital":          myObject.Features.Capital,
+				"coordinates":      myObject.Features.Coordinates,
+				"population":       myObject.Features.Population,
+				"area":             myObject.Features.Area,
+				"targetCurrencies": myObject.Features.TargetCurrencies,
+			},
+			"lastChange": time.Now(),
+		}
+		//Updates the document with the map
+		_, err := docRef.Set(ctx, data)
+		if err != nil {
+			//If document does not exist, it creates a new one
+			if status.Code(err) == codes.NotFound {
+				_, err = docRef.Create(ctx, data)
+				if err != nil {
+					http.Error(w, "failed to create document", http.StatusInternalServerError)
+					return nil
+				}
+				//Else, there is something else wrong with it
+			} else {
+				http.Error(w, "failed to update data", http.StatusInternalServerError)
+				return nil
+			}
+		}
+
+		//If user put in a PATCH request
+	} else {
+		//Fetching the document, checks if it exists
+		doc, err := docRef.Get(ctx)
+		if err != nil {
+			if status.Code(err) == codes.NotFound {
+				http.Error(w, "Document does not exist, cannot PATCH", http.StatusBadRequest)
+				return nil
+			}
+		}
+		//Creates a new object, that fetches data from firebase
+		var newObject utils.Firestore
+		doc.DataTo(&newObject)
+
+		//Merges the data from firebase with user input (that has been written)
+		final, _, _ := updatedData(&newObject, &myObject)
+
+		//Updates the document
+		_, err = docRef.Set(ctx, map[string]interface{}{
+			"country": final.Country,
+			"isoCode": final.IsoCode,
+			"features": map[string]interface{}{
+				"temperature":      final.Features.Temperature,
+				"precipitation":    final.Features.Precipitation,
+				"capital":          final.Features.Capital,
+				"coordinates":      final.Features.Coordinates,
+				"population":       final.Features.Population,
+				"area":             final.Features.Area,
+				"targetCurrencies": final.Features.TargetCurrencies,
+			},
+			"lastChange": time.Now(),
+		})
+		if err != nil {
+			http.Error(w, "Failed to patch", http.StatusInternalServerError)
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Checks for all the elements in the struct if the input by user includes these values.
+// will then replace with only the written in values, avoids multiple null values if they are not written in
+// returns the object with values, a bool to check if values are missing, and a string array containing all
+// names of the missing elements, to inform the user
+func updatedData(newObject *utils.Firestore, myObject *utils.Firestore) (*utils.Firestore, bool, []string) {
+	checkIfMissingElements := false
+	missingElements := make([]string, 0)
+	if !isEmptyField(myObject.Country) {
+		newObject.Country = myObject.Country
+	} else {
+		checkIfMissingElements = true
+		missingElements = append(missingElements, "Country")
+	}
+	if !isEmptyField(myObject.IsoCode) {
+		newObject.IsoCode = myObject.IsoCode
+	} else {
+		checkIfMissingElements = true
+		missingElements = append(missingElements, "IsoCode")
+	}
+	if !isEmptyField(myObject.Features.Area) {
+		newObject.Features.Area = myObject.Features.Area
+	} else {
+		checkIfMissingElements = true
+		missingElements = append(missingElements, "Area")
+	}
+	if !isEmptyField(myObject.Features.Capital) {
+		newObject.Features.Capital = myObject.Features.Capital
+	} else {
+		checkIfMissingElements = true
+		missingElements = append(missingElements, "Capital")
+	}
+	if !isEmptyField(myObject.Features.Coordinates) {
+		newObject.Features.Coordinates = myObject.Features.Coordinates
+	} else {
+		checkIfMissingElements = true
+		missingElements = append(missingElements, "Coordinates")
+	}
+	if !isEmptyField(myObject.Features.Precipitation) {
+		newObject.Features.Precipitation = myObject.Features.Precipitation
+	} else {
+		checkIfMissingElements = true
+		missingElements = append(missingElements, "Precipitation")
+	}
+	if !isEmptyField(myObject.Features.Temperature) {
+		newObject.Features.Temperature = myObject.Features.Temperature
+	} else {
+		checkIfMissingElements = true
+		missingElements = append(missingElements, "Temperature")
+	}
+	if !isEmptyField(myObject.Features.Population) {
+		newObject.Features.Population = myObject.Features.Population
+	} else {
+		checkIfMissingElements = true
+		missingElements = append(missingElements, "Population")
+	}
+	if !isEmptyField(myObject.Features.TargetCurrencies) {
+		newObject.Features.TargetCurrencies = myObject.Features.TargetCurrencies
+	} else {
+		checkIfMissingElements = true
+		missingElements = append(missingElements, "Target Currencies")
+	}
+	return newObject, checkIfMissingElements, missingElements
+
 }
