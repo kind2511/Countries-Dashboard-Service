@@ -400,9 +400,6 @@ func retrieveDocumentData(w http.ResponseWriter, doc *firestore.DocumentSnapshot
 	// Set the Content-Type header to application/json
 	w.Header().Set("Content-Type", "application/json")
 
-	// Set the status code to 200
-	w.WriteHeader(http.StatusOK)
-
 	// Write the JSON data to the response
 	if _, err := w.Write(jsonData); err != nil {
 		log.Println("Error writing JSON response:", err)
@@ -497,6 +494,7 @@ func deleteDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+
 
 // Checks if a value is empty, returns true if it is
 func isEmptyField(value interface{}) bool {

@@ -64,10 +64,10 @@ type WebhookGetResponse struct {
 }
 
 type Firestore struct {
-	ID		   string   `json:id`
-	Country    string   `json:"country"`
-	Features   Features `json:"features"`
-	IsoCode    string   `json:"isoCode"`
+	ID		   string    `json:id`
+	Country    string    `json:"country"`
+	Features   Features  `json:"features"`
+	IsoCode    string    `json:"isoCode"`
 	LastChange time.Time `json:"lastChange"`
 }
 
