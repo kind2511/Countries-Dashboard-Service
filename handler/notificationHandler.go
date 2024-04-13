@@ -24,11 +24,7 @@ func NotificationHandler(w http.ResponseWriter, r *http.Request) {
 		RegisterWebhook(r, w)
 
 	case http.MethodDelete:
-		println("Delete " + id)
-
-		// Finn i DB og slett
-
-		http.Error(w, "", http.StatusNoContent)
+		DeleteWebhook(w, r)
 
 	case http.MethodGet:
 		if id == "" {
@@ -59,6 +55,39 @@ func NotificationHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method "+r.Method+" not supported for "+structs.NOTIFICATION_PATH, http.StatusMethodNotAllowed)
 
 	}
+}
+
+// Function to delete a webhook
+func DeleteWebhook(w http.ResponseWriter, r *http.Request) {
+	// split the url to get the id
+	elem := strings.Split(r.URL.Path, "/")
+
+	// Check if the id is provided
+	if elem[4] == "" || len(elem) != 5 {
+		http.Error(w, "Invalid lenght og the url path, include the id for the webhook you want to delete", http.StatusBadRequest)
+		return
+	}
+
+	// Get the id of the webhook
+	webhooksID := elem[4]
+
+	// Delete a webhook with the spesified id from the firestore database
+	webhook := client.Collection(collectionWebhooks).Doc(webhooksID)
+	_, err := webhook.Get(ctx)
+	if err != nil {
+		http.Error(w, "No webhooks of that ID can be found", http.StatusNotFound)
+		return
+	}
+
+	// Delete webhook from storage
+	_, status := webhook.Delete(ctx)
+	if status != nil {
+		http.Error(w, "Error while deleting webhook", http.StatusInternalServerError)
+		return
+	}
+
+	// Return success message
+	http.Error(w, "The webhook have been successfully deleted", http.StatusOK)
 }
 
 // Adds new webhook registration to firebase
