@@ -16,7 +16,7 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 	upTime := time.Since(startTime).Seconds()
 
 	// Gets status-code for Countries API
-	countriesApiStatusCode, err := http.Get(utils.COUNTRIES_API + "/name/norway")
+	countriesApiStatusCode, err := http.Get(utils.COUNTRIES_API + "name/Norway")
 	if err != nil {
 		err = fmt.Errorf("error occured while making HTTP request: %v", err)
 		fmt.Println(err)
@@ -39,20 +39,24 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	notificationStatus, err := http.Get("https://console.firebase.google.com/project/prog2005-assignment2-ee93a/firestore/databases/-default-/data/~2FDashboard~2FXhjRXlZcd7uLTMd8kdxb")
+	// Gets status-code for Notification DB
+	notificationStatus, err := http.Get("https://console.firebase.google.com/project/prog2005-assignment2-ee93a/firestore/databases/-default-/data/~2Fwebhooks")
 	if err != nil {
 		err = fmt.Errorf("error occured while making HTTP request: %v", err)
 		fmt.Println(err)
 		return
 	}
 
-	// Creates status struct (hardcoded now)
+	// get the number of webhooks in the database
+	numOfWebhooks, _ := GetWebhookSize()
+
+	// Creates status struct
 	Status := utils.Status{
 		Countriesapi:   countriesApiStatusCode.StatusCode,
 		Meteoapi:       meteoApiStatusCode.StatusCode,
 		Currencyapi:    currencyApiStatusCode.StatusCode,
 		Notificationdb: notificationStatus.StatusCode,
-		Webhooks:       1,
+		Webhooks:       numOfWebhooks,
 		Version:        "v1",
 		Uptime:         upTime,
 	}
@@ -67,8 +71,19 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unable to marshal status to JSON", http.StatusInternalServerError)
 		return
 	}
-
 	// Write JSON response to the response body
 	w.Write(statusJSON)
 
+}
+
+// name of collection used for webhooks
+const collectionWebhooks = "webhooks"
+
+// Function for getting the number of webhooks in the database
+func GetWebhookSize() (int, error) {
+	webhooks, err := client.Collection(collectionWebhooks).Documents(ctx).GetAll()
+	if err != nil {
+		return -1, err
+	}
+	return len(webhooks), nil
 }

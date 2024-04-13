@@ -41,7 +41,7 @@ type Status struct {
 	Meteoapi       int     `json:"meteoapi"`
 	Currencyapi    int     `json:"currencyapi"`
 	Notificationdb int     `json:"notificationdb"`
-	Webhooks       float64 `json:"webhooks"`
+	Webhooks       int     `json:"webhooks"`
 	Version        string  `json:"version"`
 	Uptime         float64 `json:"uptime"`
 }
