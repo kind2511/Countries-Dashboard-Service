@@ -23,8 +23,32 @@ func NotificationHandler(w http.ResponseWriter, r *http.Request) {
 	id := urlParts[len(urlParts)-1]
 
 	switch r.Method {
-	case http.MethodPost: //registration of webhooks
-		RegisterWebhook(r, w)
+	case http.MethodPost:
+		webhook := structs.WebhookRegistration{}
+		err := json.NewDecoder(r.Body).Decode(&webhook)
+		if err != nil {
+			http.Error(w, "Something went wrong"+err.Error(), http.StatusBadRequest)
+		}
+		if webhook.Event == "REGISTER" {
+			// Firebase for å lage persistent storage
+			webhooks = append(webhooks, webhook)
+			id := uuid.New()
+			fmt.Println("ID: " + id.String())
+
+			idStruct := structs.WebhookRegistrationResponse{
+				Id: id.String(),
+			}
+
+			response, err := json.Marshal(idStruct)
+			if err != nil {
+				// error
+			}
+
+			log.Println("Webhook " + webhook.Url + " has been registered")
+
+			http.Error(w, string(response), http.StatusCreated)
+
+		}
 
 	case http.MethodDelete:
 		DeleteWebhook(w, r)
