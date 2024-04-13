@@ -182,12 +182,12 @@ func retrieveWebHookData(w http.ResponseWriter, doc *firestore.DocumentSnapshot)
 // Gets one webhook based on its Firestore ID. If no ID is provided it gets all webhooks
 func getWebHooks(w http.ResponseWriter, r *http.Request) {
 	const webhookCollection = "webhooks"
-	// Extract dashboard ID from URL
+	// Extract webhook ID from URL
 	elem := strings.Split(r.URL.Path, "/")
 	webhookID := elem[4]
 
 	if len(webhookID) != 0 {
-		// Query documents where the 'id' field matches the provided dashboardID
+		// Query documents where the 'id' field matches the provided webhookID
 		query := client.Collection(webhookCollection).Where("id", "==", webhookID).Limit(1)
 		iter := query.Documents(ctx)
 
