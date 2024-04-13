@@ -41,7 +41,7 @@ type Status struct {
 	Meteoapi       int     `json:"meteoapi"`
 	Currencyapi    int     `json:"currencyapi"`
 	Notificationdb int     `json:"notificationdb"`
-	Webhooks       float64 `json:"webhooks"`
+	Webhooks       int     `json:"webhooks"`
 	Version        string  `json:"version"`
 	Uptime         float64 `json:"uptime"`
 }
@@ -90,3 +90,9 @@ type Registration struct {
 	LastChange string   `json:"lastChange"`
 }
 
+// Desired output for default handler
+type DefaultEndpointStruct struct {
+	Url         string `json:"url"`
+	Method      string `json:"method"`
+	Description string `json:"description"`
+}
