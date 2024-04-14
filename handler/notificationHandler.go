@@ -24,7 +24,7 @@ func NotificationHandler(w http.ResponseWriter, r *http.Request) {
 		RegisterWebhook(r, w)
 
 	case http.MethodDelete:
-		DeleteWebhook(w, r)
+		deleteWebhook(w, r)
 
 	case http.MethodGet:
 		if id == "" {
@@ -57,37 +57,31 @@ func NotificationHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Function to delete a webhook
-func DeleteWebhook(w http.ResponseWriter, r *http.Request) {
-	// split the url to get the id
+// Function to delete a webhook by its ID
+func deleteWebhook(w http.ResponseWriter, r *http.Request) {
+	// Extract dashboard ID from URL
 	elem := strings.Split(r.URL.Path, "/")
+	webhookID := elem[4]
 
-	// Check if the id is provided
-	if elem[4] == "" || len(elem) != 5 {
-		http.Error(w, "Invalid lenght og the url path, include the id for the webhook you want to delete", http.StatusBadRequest)
+	if len(webhookID) != 0 {
+		// Get reference to the document
+		docRef := client.Collection(collectionWebhooks).Doc(webhookID)
+
+		// Delete the document
+		_, err := docRef.Delete(ctx)
+		if err != nil {
+			log.Println("Error deleting document:", err)
+			http.Error(w, "Error deleting document", http.StatusInternalServerError)
+			return
+		}
+
+		// Return success message
+		w.WriteHeader(http.StatusNoContent)
+	} else {
+		// If Dashboard ID is not provided
+		http.Error(w, "Webhook ID not provided", http.StatusBadRequest)
 		return
 	}
-
-	// Get the id of the webhook
-	webhooksID := elem[4]
-
-	// Delete a webhook with the spesified id from the firestore database
-	webhook := client.Collection(collectionWebhooks).Doc(webhooksID)
-	_, err := webhook.Get(ctx)
-	if err != nil {
-		http.Error(w, "No webhooks of that ID can be found", http.StatusNotFound)
-		return
-	}
-
-	// Delete webhook from storage
-	_, status := webhook.Delete(ctx)
-	if status != nil {
-		http.Error(w, "Error while deleting webhook", http.StatusInternalServerError)
-		return
-	}
-
-	// Return success message
-	http.Error(w, "The webhook have been successfully deleted", http.StatusOK)
 }
 
 // Adds new webhook registration to firebase
