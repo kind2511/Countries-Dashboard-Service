@@ -75,9 +75,9 @@ Body (exemplary code):
 }
 ```
 
-### - Response
+**Response**
 
-The response to the POST request on the endpoint stores the configuration on the server and returns the associated ID. In the example below, it is the ID `1`. Responses show be encoded in the above-mentioned JSON format, with the `lastChange` field highlighting the last change to the configuration (including updates via `PUT` - see later)
+The response stores the configuration on the server and returns the associated ID. In the example below, it is the ID `1`. Responses show be encoded in the above-mentioned JSON format, with the `lastChange` field highlighting the last change to the configuration (including updates via `PUT`)
 
 * Content type: `application/json`
 * Status code: Appropriate error code.
@@ -107,7 +107,7 @@ Path: /dashboard/v1/registrations/{id}
 
 Example request: ```/dashboard/v1/registrations/1``` 
 
-### - Response
+**Response**
 
 * Content type: `application/json`
 * Status code: Appropriate error code. 
@@ -144,7 +144,7 @@ Method: GET
 Path: /dashboard/v1/registrations/
 ```
 
-### - Response
+**Response**
 
 * Content type: `application/json`
 * Status code: Appropriate error code.
@@ -193,18 +193,18 @@ The response return a collection of return all stored configurations.
 
 Enables the replacing of specific registered dashboard configurations.
 
-### - Request (PUT)
+### - Request (PUT) & (PATCH)
 
 The following shows a request for an updated of individual configuration identified by its ID. This update should lead to an update of the configuration and an update of the associated timestamp (`lastChange`).
 
 ```
-Method: PUT
+Method: PUT / PATCH
 Path: /dashboard/v1/registrations/{id}
 ```
 
 * `id` is the ID associated with the specific configuration.
 
-Example request: ```/dashboard/v1/registrations/1``` 
+Example request PUT: ```/dashboard/v1/registrations/1``` 
 
 Body (exemplary code):
 ```
@@ -224,9 +224,9 @@ Body (exemplary code):
 ```
 
 Note that the request neither contains ID in the body (only in the URL), and neither contains the timestamp.  
+The PATCH method has also been implemented here. 
 
-
-### - Response
+**Response**
 
 This is the response to the change request.
 
@@ -250,12 +250,12 @@ Path: /dashboard/v1/registrations/{id}
 
 Example request: ```/dashboard/v1/registrations/1``` 
 
-### - Response
+**Response**
 
 This is the response to the delete request.
 
 * Status code: Appropriate error code.
-* Body: empty
+* Body: Message it has been deleted
 
 ## Endpoint 'Dashboards': Retrieve populated dashboard
 
@@ -274,7 +274,7 @@ Path: /dashboard/v1/dashboards/{id}
 
 Example request: ```/dashboard/v1/dashboards/1``` 
 
-### - Response
+**Response**
 
 * Content type: `application/json`
 * Status code: Appropriate error code.
@@ -335,7 +335,7 @@ Body (Exemplary message based on schema):
    "event": "INVOKE"                         // Event on which it is invoked
 }
 ```
-### - Response
+**Response**
 
 The response contains the ID for the registration that can be used to see detail information or to delete the webhook registration. The format of the ID is not prescribed, as long it is unique. Consider best practices for determining IDs.
 
@@ -362,7 +362,7 @@ Path: /dashboard/v1/notifications/{id}
 
 * {id} is the ID returned during the webhook registration
 
-### - Response
+**Response**
 
 Implemented the response according to best practices.
 
@@ -378,7 +378,7 @@ Path: /dashboard/v1/notifications/{id}
 ```
 * `{id}` is the ID for the webhook registration
 
-### - Response
+**Response**
 
 The response is similar to the POST request body, but further includes the ID assigned by the server upon adding the webhook.
 
@@ -406,7 +406,7 @@ Method: GET
 Path: /dashboard/v1/notifications/
 ```
 
-### - Response
+**Response**
 
 The response is a collection of all registered webhooks.
 
@@ -463,10 +463,10 @@ Method: GET
 Path: dashboard/v1/status/
 ```
 
-### - Response
+**Response**
 
 * Content type: `application/json`
-* Status code: 200 if everything is OK, appropriate error code otherwise. 
+* Status code: appropriate error code. 
 
 Body:
 ```
@@ -482,8 +482,6 @@ Body:
 }
 ```
 
-Note: `<some value>` indicates placeholders for values to be populated by the service as described for the corresponding values.
-
 # Additional requirements
 
 * All endpoints should be *tested using automated testing facilities provided by Go (unit tests, httptest package)*. 
@@ -495,4 +493,5 @@ Note: `<some value>` indicates placeholders for values to be populated by the se
 
 # Deployment
 
-The service is to be deployed on an IaaS solution OpenStack using Docker (both to be discussed in class). You will need to provide the URL to the deployed service as part of the submission, in addition the source repository.
+The service is to be deployed on an IaaS solution OpenStack using Docker. 
+URL to deployed service: <url....>
