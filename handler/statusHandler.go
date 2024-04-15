@@ -10,6 +10,15 @@ import (
 
 var startTime = time.Now()
 
+// Function to check if an error occured while making an HTTP request
+func checkHTTPError(err error) {
+	if err != nil {
+		err = fmt.Errorf("error occured while making HTTP request: %v", err)
+		fmt.Println(err)
+		return
+	}
+}
+
 func StatusHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Time the server has been running since start
@@ -17,35 +26,19 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Gets status-code for Countries API
 	countriesApiStatusCode, err := http.Get(utils.COUNTRIES_API + "name/Norway")
-	if err != nil {
-		err = fmt.Errorf("error occured while making HTTP request: %v", err)
-		fmt.Println(err)
-		return
-	}
+	checkHTTPError(err)
 
 	// Gets status-code for Meteo API
 	meteoApiStatusCode, err := http.Get(utils.GEOCODING_API + "Norway&count=1&language=en&format=json")
-	if err != nil {
-		err = fmt.Errorf("error occured while making HTTP request: %v", err)
-		fmt.Println(err)
-		return
-	}
+	checkHTTPError(err)
 
 	// Gets status-code for Currency API
 	currencyApiStatusCode, err := http.Get(utils.CURRENCY_API + "/nok")
-	if err != nil {
-		err = fmt.Errorf("error occured while making HTTP request: %v", err)
-		fmt.Println(err)
-		return
-	}
+	checkHTTPError(err)
 
 	// Gets status-code for Notification DB
 	notificationStatus, err := http.Get("https://console.firebase.google.com/project/prog2005-assignment2-ee93a/firestore/databases/-default-/data/~2Fwebhooks")
-	if err != nil {
-		err = fmt.Errorf("error occured while making HTTP request: %v", err)
-		fmt.Println(err)
-		return
-	}
+	checkHTTPError(err)
 
 	// get the number of webhooks in the database
 	numOfWebhooks, _ := GetWebhookSize()
