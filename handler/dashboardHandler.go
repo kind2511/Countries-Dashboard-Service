@@ -98,13 +98,13 @@ func DashboardFunc(w http.ResponseWriter, r *http.Request) error {
 		//Fetching variables from functions
 
 		//Fetching population, capital, their own currency and are
-		population, capital, countryCurrency, area, err := retrieveCountryData(myObject.Country, w, r)
+		population, capital, countryCurrency, area, err := retrieveCountryData(utils.COUNTRIES_API, myObject.Country, w, r)
 		if err != nil {
 			return err
 		}
 
 		//Fetching coordinates from chosen capital
-		longitude, latitude, err := retrieveCoordinates(capital, w, r)
+		longitude, latitude, err := retrieveCoordinates(utils.GEOCODING_API, capital, w, r)
 		if err != nil {
 			return err
 		}
@@ -164,7 +164,7 @@ func DashboardFunc(w http.ResponseWriter, r *http.Request) error {
 		c := make(map[string]myFloat)
 
 		//Makes the map with exchange rates for fetched currency earlier
-		currencyRates, err := retrieveCurrencyExchangeRates(countryCurrency, w, r)
+		currencyRates, err := retrieveCurrencyExchangeRates(utils.CURRENCY_API, countryCurrency, w, r)
 		if err != nil {
 			return err
 		}
@@ -219,7 +219,7 @@ func fetchURLdata(myData string, w http.ResponseWriter, data interface{}) error 
 /*
 Function will return population, capital, currency and area on a certain country
 */
-func retrieveCountryData(country string, w http.ResponseWriter, r *http.Request) (int, string, string, myFloat, error) {
+func retrieveCountryData(apiURL, country string, w http.ResponseWriter, r *http.Request) (int, string, string, myFloat, error) {
 
 	myCountry := country
 
@@ -233,7 +233,7 @@ func retrieveCountryData(country string, w http.ResponseWriter, r *http.Request)
 	var chosenCountry []Country
 
 	//Fetches data from specified country
-	err := fetchURLdata(utils.COUNTRIES_API+"name/"+myCountry, w, &chosenCountry)
+	err := fetchURLdata(apiURL+"name/"+myCountry, w, &chosenCountry)
 	if err != nil {
 		return 0, "", "", 0, err
 	}
@@ -267,14 +267,14 @@ func retrieveCountryData(country string, w http.ResponseWriter, r *http.Request)
 This function will retrieve the capital, and then return coordinates to capital,
 Will use Geocoding API to fetch coordinates
 */
-func retrieveCoordinates(capital string, w http.ResponseWriter, r *http.Request) (myFloat, myFloat, error) {
+func retrieveCoordinates(apiURL, capital string, w http.ResponseWriter, r *http.Request) (myFloat, myFloat, error) {
 
 	//Creates struct that contains coordinates
 	var myCoordinates struct {
 		Result []Coordinates `json:"results"`
 	}
 	//Fetching data from Geocoding API, with count 1, to retrieve first city with this name
-	err := fetchURLdata(utils.GEOCODING_API+capital+"&count=1", w, &myCoordinates)
+	err := fetchURLdata(apiURL+capital+"&count=1", w, &myCoordinates)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -335,14 +335,14 @@ func retrieveWeather(longitude myFloat, latitude myFloat, w http.ResponseWriter,
 	return avgTemp, avgPrecipitation, nil
 }
 
-func retrieveCurrencyExchangeRates(currency string, w http.ResponseWriter, r *http.Request) (map[string]myFloat, error) {
+func retrieveCurrencyExchangeRates(apiURL, currency string, w http.ResponseWriter, r *http.Request) (map[string]myFloat, error) {
 	currencyData := make(map[string]myFloat)
 
 	var Currencies struct {
 		Currency map[string]myFloat `json:"rates"`
 	}
 
-	err := fetchURLdata(utils.CURRENCY_API+currency, w, &Currencies)
+	err := fetchURLdata(apiURL+currency, w, &Currencies)
 	if err != nil {
 		return nil, err
 	}

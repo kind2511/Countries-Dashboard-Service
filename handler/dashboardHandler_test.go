@@ -15,12 +15,11 @@ func TestDashboardsHandler(t *testing.T) {
 	// Initialize handler instance
 	handler := DashboardHandler()
 
-	// set up structure to be used for testing
+	// set up structure to be used for testing and close when finished testing
 	server := httptest.NewServer(http.HandlerFunc(handler))
-	// Close the server when test finishes
 	defer server.Close()
 
-	// URL where instance is running
+	// local server URL
 	fmt.Println("URL: ", server.URL)
 
 	// Create client instance
@@ -37,23 +36,24 @@ func TestDashboardsHandler(t *testing.T) {
 		t.Fatal("Get request has wrong status code", err.Error())
 	}
 
-	// test unsupported Head request
+	// test of unsupported method
 	res2, err2 := client.Head(server.URL + utils.DASHBOARD_PATH)
 	if err2 != nil {
 		t.Fatal("Head request to URL failed:", err.Error())
 	}
 
-	// test http status
+	// test http status for unsupported method
 	if res2.Status != "405 Method Not Allowed" {
 		t.Fatal("un supported method has wrong status code", err.Error())
 	}
 
-	// HTTP method checking
+	// HTTP method checking for POST
 	req, err := http.NewRequest("POST", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// Create a ResponseRecorder to record the response.
 	rr := httptest.NewRecorder()
 	handler2 := http.HandlerFunc(DashboardHandler())
 
@@ -73,6 +73,7 @@ func TestDashboardsHandler(t *testing.T) {
 
 }
 
+// Test function for fetchURLdata
 func TestFetchURLData(t *testing.T) {
 	// Start a local HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -126,5 +127,67 @@ func TestFloatFormat(t *testing.T) {
 	expected := myFloat(1.23)
 	if floatFunc != expected {
 		t.Errorf("Expected %v, got %v", expected, floatFunc)
+	}
+}
+func TestRetrieveCountryData(t *testing.T) {
+	// Start a local HTTP server
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		// Send response to be tested
+		rw.Write([]byte(`[{"population": 123456, "capital": ["Capital"], "currencies": {"Currency": {}}, "area": 123.45}]`))
+	}))
+	// Close the server when test finishes
+	defer server.Close()
+
+	// Call the function with the mock server URL
+	population, capital, currency, area, err := retrieveCountryData(server.URL+"/name/", "TestCountry", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check the data
+	if population != 123456 || capital != "Capital" || currency != "Currency" || area != 123.45 {
+		t.Errorf("Expected population to be 123456, capital to be Capital, currency to be Currency, and area to be 123.45, got %v, %v, %v and %v", population, capital, currency, area)
+	}
+}
+
+func TestRetrieveCoordinates(t *testing.T) {
+	// Start a local HTTP server
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		// Send response to be tested
+		rw.Write([]byte(`{"results": [{"geometry": {"location": {"lng": 0, "lat": 0}}}]}`))
+	}))
+	// Close the server when test finishes
+	defer server.Close()
+
+	// Call the function with the mock server URL
+	longitude, latitude, err := retrieveCoordinates(server.URL+"/json?address=", "TestLocation", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check the data
+	if longitude != 0 || latitude != 0 {
+		t.Errorf("Expected longitude to be 0 and latitude to be 0, got %v and %v", longitude, latitude)
+	}
+}
+
+func TestRetrieveCurrencyExchangeRates(t *testing.T) {
+	// Start a local HTTP server
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		// Send response to be tested
+		rw.Write([]byte(`{"rates": {"USD": 1.23, "EUR": 0.89}}`))
+	}))
+	// Close the server when test finishes
+	defer server.Close()
+
+	// Call the function with the mock server URL
+	currencyData, err := retrieveCurrencyExchangeRates(server.URL+"/latest?base=", "USD", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check the data
+	if currencyData["USD"] != 1.23 || currencyData["EUR"] != 0.89 {
+		t.Errorf("Expected currencyData to be {\"USD\": 1.23, \"EUR\": 0.89}, got %v", currencyData)
 	}
 }
