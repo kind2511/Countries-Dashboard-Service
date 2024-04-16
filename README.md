@@ -1,12 +1,11 @@
-# Countries Dashboard Service
+# Countries Dashboard Service - Assignment 2
 
-[TOC]
+## Description
+This project is our group submission to the second assignment in PROG2005.
 
-# Overview
+In this assignment we have developed a REST web application in Golang that provides the client with the ability to configure information dashboards about countries, that are dynamically populated when requested. They are populated based on external services, and includes a simple notification service that can listen to specific events. The service manage state using databases, and webhooks as notification feature. 
 
-In this group assignment, we have develop a REST web application in Golang that provides the client with the ability to configure information dashboards that are dynamically populated when requested. The dashboard configurations are saved in our service in a persistent way, and populated based on external services. It also include a simple notification service that can listen to specific events. The application is dockerized and deployed using an IaaS system. The service manage state using databases, as well as webhooks as notification feature and a different deployment mechanism.
-
-The services used for this purpose are:
+The external services used:
 * *REST Countries API* (instance hosted)
   * Endpoint: http://129.241.150.113:8080/v3.1
   * Documentation: http://129.241.150.113:8080/
@@ -17,11 +16,6 @@ The services used for this purpose are:
   * Documentation: http://129.241.150.113:9090/
 
 The final web service is deployed in our local OpenStack instance SkyHigh. 
-
-# Specification
-
-The implementation of the service API follow this specification, i.e., the schemas (or syntax) of request and response messages, alongside method and status codes should correspond to the ones provided below. Requests and responses are expressed using examples to illustrate the structure in populated messages.
-
 
 ## Endpoints
 
@@ -34,15 +28,8 @@ Our web service have four resource root paths:
 /dashboard/v1/status/
 ```
 
-The specification has the following conventions for placeholders:
 
-* {value} - *mandatory* value
-* {value?} - *optional* value
-* {?key=value} - *mandatory* parameter (key-value pair)
-* {?key=value?} - *optional* parameter (key-value pair)
-* {?key=value*} - one or more optional parameters 
-
-## Endpoint 'Registrations': Registering dashboard configuration
+## Endpoint 'Registrations':
 
 The initial endpoint focuses on the management of dashboard configurations that can later be used via the `dashboards` endpoint.
 
@@ -50,7 +37,7 @@ The initial endpoint focuses on the management of dashboard configurations that 
 
 Manages the registration of new dashboard configurations that indicate which information is to be shown for registered dashboards. This includes weather, country and currency exchange information.
 
-### - Request (POST) 
+**Request** **(POST)** 
 
 ```
 Method: POST
@@ -92,9 +79,7 @@ Body (exemplary code for registered configuration):
 
 ### View a **specific registered dashboard configuration**
 
-Enables retrieval of a specific registered dashboard configuration.
-
-### - Request (GET)
+**Request (GET)**
 
 The following shows a request for an individual configuration identified by its ID.
 
@@ -133,11 +118,9 @@ Body (exemplary code):
 
 ### View **all registered dashboard configurations**
 
-Enables retrieval of all registered dashboard configurations.
+**Request (GET)**
 
-### - Request (GET)
-
-A `GET` request to the endpoint should return all registered configurations including IDs and timestamps of last change.
+A `GET` request to the endpoint return all registered configurations including IDs and timestamps of last change.
 
 ```
 Method: GET
@@ -189,13 +172,12 @@ Body (exemplary code):
 The response return a collection of return all stored configurations.
 
 
-### Replace a **specific registered dashboard configuration**
+### Replace specific registered dashboard configurations
 
-Enables the replacing of specific registered dashboard configurations.
 
-### - Request (PUT) & (PATCH)
+**Request (PUT) & (PATCH)**
 
-The following shows a request for an updated of individual configuration identified by its ID. This update should lead to an update of the configuration and an update of the associated timestamp (`lastChange`).
+This request allows updating an individual configuration identified by its ID. Using either PUT or PATCH, you can modify the configuration, which also updates the associated timestamp (lastChange). The PUT method replaces the entire configuration with the new data provided in the request body, while the PATCH method applies partial updates to the configuration, allowing for more granular changes without affecting the entire configuration at once
 
 ```
 Method: PUT / PATCH
@@ -223,9 +205,6 @@ Body (exemplary code):
 }
 ```
 
-Note that the request neither contains ID in the body (only in the URL), and neither contains the timestamp.  
-The PATCH method has also been implemented here. 
-
 **Response**
 
 This is the response to the change request.
@@ -235,11 +214,9 @@ This is the response to the change request.
 
 ### Delete a **specific registered dashboard configuration**
 
-Enabling the deletion of a specific registered dashboard configuration.
+**Request (DELETE)**
 
-### - Request (DELETE)
-
-The following shows a request for deletion of an individual configuration identified by its ID. This update should lead to a deletion of the configuration on the server.
+The following shows a request for deletion of an individual configuration identified by its ID.
 
 ```
 Method: DELETE
@@ -257,13 +234,14 @@ This is the response to the delete request.
 * Status code: Appropriate error code.
 * Body: Message it has been deleted
 
-## Endpoint 'Dashboards': Retrieve populated dashboard
+## Endpoint 'Dashboards':
 
 This endpoint can be used to retrieve the populated dashboards.
 
-### - Request (GET) - Retrieving a **specific populated dashboard**
+**Request (GET)** 
 
-The following shows a request for an individual dashboard identified by its ID (same as the corresponding configuration ID).
+Retrieving a specific populated dashboard
+The following shows a request for an individual dashboard identified by its ID.
 
 ```
 Method: GET
@@ -277,7 +255,6 @@ Example request: ```/dashboard/v1/dashboards/1```
 **Response**
 
 * Content type: `application/json`
-* Status code: Appropriate error code.
 
 Body (exemplary code):
 ```
@@ -306,11 +283,11 @@ Body (exemplary code):
 
 ## Endpoint 'Notifications': Managing webhooks for event notifications
 
-As an additional feature, users can register webhooks that are triggered by the service based on specified events, specifically if a new configuration is created, changed or deleted. Users can also register for invocation events, i.e., when a dashboard for a given country is invoked. Users can register multiple webhooks. The registrations should survive a service restart (i.e., be persistently stored).
+The users can register webhooks that are triggered by the service based on specified events, specifically if a new configuration is created, changed or deleted. Users can also register for invocation events, i.e., when a dashboard for a given country is invoked. Users can register multiple webhooks, and they are persistently stored.
 
 ### Registration of Webhook
 
-### - Request (POST)
+**Request (POST)**
 
 ```
 Method: POST
@@ -337,10 +314,7 @@ Body (Exemplary message based on schema):
 ```
 **Response**
 
-The response contains the ID for the registration that can be used to see detail information or to delete the webhook registration. The format of the ID is not prescribed, as long it is unique. Consider best practices for determining IDs.
-
 * Content type: `application/json`
-* Status code: Choose an appropriate status code
 
 Body (Exemplary message based on schema):
 ```
@@ -351,9 +325,7 @@ Body (Exemplary message based on schema):
 
 ### Deletion of Webhook
 
-Deletes a given webhook.
-
-### - Request (DELETE)
+**Request (DELETE)**
 
 ```
 Method: DELETE
@@ -364,13 +336,11 @@ Path: /dashboard/v1/notifications/{id}
 
 **Response**
 
-Implemented the response according to best practices.
+Returns success as a http.StatusNoContent  
 
 ### View *specific registered* webhook
 
-Shows a specific webhook registration.
-
-### - Request (GET)
+**Request (GET)**
 
 ```
 Method: GET
@@ -379,8 +349,6 @@ Path: /dashboard/v1/notifications/{id}
 * `{id}` is the ID for the webhook registration
 
 **Response**
-
-The response is similar to the POST request body, but further includes the ID assigned by the server upon adding the webhook.
 
 * Content type: `application/json`
 
@@ -397,9 +365,7 @@ Body (Exemplary message based on schema):
 
 ### View *all registered* webhooks
 
-Lists all registered webhooks.
-
-### - Request (GET)
+**Request (GET)**
 
 ```
 Method: GET
@@ -433,7 +399,7 @@ Body (Exemplary message based on schema):
 
 ### Webhook Invocation (upon trigger)
 
-When a webhook is triggered, it should send information as follows. Where multiple webhooks are triggered, the information should be sent separately (i.e., one notification per triggered webhook).
+When a webhook is triggered, it sends information as follows. Where multiple webhooks are triggered, the information is sent separately. 
 
 ```
 Method: POST
@@ -452,11 +418,8 @@ Body (Exemplary message based on schema):
 ```
 
 
-## Endpoint 'Status': Monitoring service availability
-
-The status interface indicates the availability of all individual services this service depends on. The reporting occurs based on status codes returned by the dependent services. The status interface further provides information about the number of registered webhooks (specification below), and the uptime of the service.
-
-### - Request (GET)
+## Endpoint 'Status'
+This endpoint is monitoring service availability, indicating availability on services this service depends on reporting appropriate error codes. With the addition of information about number of webhooks and uptime of the service. 
 
 ```
 Method: GET
@@ -482,16 +445,15 @@ Body:
 }
 ```
 
-# Additional requirements
+## Additional requirements
 
-* All endpoints should be *tested using automated testing facilities provided by Go (unit tests, httptest package)*. 
-  * This includes the stubbing of the third-party endpoints to ensure test reliability (removing dependency on external services).
-  * Include the testing of handlers using the httptest package. Your code should be structured to support this. 
-  * Try to maximize test coverage as reported by Golang.
-* Think about which information you can cache to minimise invocation on the third-party libraries. Use Firebase for this purpose.
+* All endpoints is *tested using automated testing facilities (unit tests, httptest package)*. 
+  * Including the stubbing of the third-party endpoints to ensure test reliability (removing dependency on external services). 
+* Used Firebase to minimize invocation on third-party libraries. 
 
 
-# Deployment
+## Deployment
 
 The service is to be deployed on an IaaS solution OpenStack using Docker. 
-URL to deployed service: <url....>
+
+URL to deployed service on SkyHigh: <url....>
