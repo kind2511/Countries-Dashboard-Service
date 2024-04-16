@@ -56,10 +56,17 @@ type Coordinates struct {
 }
 
 // Handler function that checks if method is set to GET
-func DashboardHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodGet {
-		DashboardFunc(w, r)
+func DashboardHandler() func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			DashboardFunc(w, r)
+		default:
+			http.Error(w, "Method "+r.Method+" not supported.", http.StatusMethodNotAllowed)
+			return
+		}
 	}
+
 }
 
 /*

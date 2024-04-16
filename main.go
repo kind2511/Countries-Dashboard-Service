@@ -63,7 +63,7 @@ func main() {
 	http.HandleFunc(utils.DEFAULT_PATH, handler.DefaultHandler)
 	http.HandleFunc(utils.REGISTRATION_PATH, handler.RegistrationHandler)
 
-	http.HandleFunc(utils.DASHBOARD_PATH, handler.DashboardHandler)
+	http.HandleFunc(utils.DASHBOARD_PATH, handler.DashboardHandler())
 	http.HandleFunc(utils.STATUS_PATH, handler.StatusHandler)
 	http.HandleFunc(utils.NOTIFICATION_PATH, handler.NotificationHandler)
 
