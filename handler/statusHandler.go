@@ -8,18 +8,30 @@ import (
 	"time"
 )
 
+// StatusHandler handles the status endpoint
+func StatusHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		statusGetRequest(w, r)
+	default:
+		http.Error(w, "Method not supported. Currently only GET is supported.", http.StatusNotImplemented)
+		return
+	}
+}
+
 var startTime = time.Now()
 
 // Function to check if an error occured while making an HTTP request
 func checkHTTPError(err error) {
 	if err != nil {
-		err = fmt.Errorf("error occured while making HTTP request: %v", err)
+		err = fmt.Errorf("error occurred while making HTTP request: %v", err)
 		fmt.Println(err)
 		return
 	}
 }
 
-func StatusHandler(w http.ResponseWriter, r *http.Request) {
+// Function to handle GET requests to the status endpoint
+func statusGetRequest(w http.ResponseWriter, _ *http.Request) {
 
 	// Time the server has been running since start
 	upTime := time.Since(startTime).Seconds()
