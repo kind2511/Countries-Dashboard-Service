@@ -90,7 +90,7 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 		if validIsocode != "" && validCountry != "" {
 
 			// Check if the target currencies are all valid values
-			validCurrencies, err := checkValidCurrencies(w, dashboard)
+			validCurrencies, err := checkValidCurrencies(utils.CURRENCY_API, w, dashboard)
 			if err != nil {
 				http.Error(w, "Error: Internal server error. "+err.Error(), http.StatusInternalServerError)
 				return
@@ -205,7 +205,7 @@ func handleValidCountryAndCode(w http.ResponseWriter, s utils.Dashboard) (string
 /*
 Functon to check valid currencies accordingly
 */
-func checkValidCurrencies(w http.ResponseWriter, d utils.Dashboard) ([]string, error) {
+func checkValidCurrencies(apiURL string, w http.ResponseWriter, d utils.Dashboard) ([]string, error) {
 
 	// Currencies from client input
 	currencies := d.RegFeatures.TargetCurrencies
@@ -239,7 +239,7 @@ func checkValidCurrencies(w http.ResponseWriter, d utils.Dashboard) ([]string, e
 	// Iterate through each currency and see if they are valid
 	for _, currency := range uniqueCurrenciesSlice {
 
-		url := utils.CURRENCY_API + currency
+		url := apiURL + currency
 
 		// Send a Get request to the currency API endpoint
 		res, err := http.Get(url)
@@ -357,17 +357,17 @@ func whatTimeNow2() string {
 
 // function to get a document based on its id field
 func getDocumentByID(ctx context.Context, collection string, dashboardID string) (*firestore.DocumentSnapshot, error) {
-    // Query documents where the 'id' field matches the provided dashboardID
-    query := client.Collection(collection).Where("id", "==", dashboardID).Limit(1)
-    iter := query.Documents(ctx)
+	// Query documents where the 'id' field matches the provided dashboardID
+	query := client.Collection(collection).Where("id", "==", dashboardID).Limit(1)
+	iter := query.Documents(ctx)
 
-    // Retrieve reference to document
-    doc, err := iter.Next()
-    if err != nil {
-        return nil, err
-    }
+	// Retrieve reference to document
+	doc, err := iter.Next()
+	if err != nil {
+		return nil, err
+	}
 
-    return doc, nil
+	return doc, nil
 }
 
 // Function to retrieve document data and write JSON response
@@ -416,18 +416,18 @@ func getDashboards(w http.ResponseWriter, r *http.Request) {
 
 	if len(dashboardID) != 0 {
 		doc, err := getDocumentByID(ctx, collection, dashboardID)
-        if err != nil {
-            if err == iterator.Done {
-                // Document not found
-                errorMessage := "Document with ID " + dashboardID + " not found"
-                http.Error(w, errorMessage, http.StatusNotFound)
-                return
-            }
-            // If trouble retrieving document
-            log.Println("Error retrieving document:", err)
-            http.Error(w, "Error retrieving document", http.StatusInternalServerError)
-            return
-        }
+		if err != nil {
+			if err == iterator.Done {
+				// Document not found
+				errorMessage := "Document with ID " + dashboardID + " not found"
+				http.Error(w, errorMessage, http.StatusNotFound)
+				return
+			}
+			// If trouble retrieving document
+			log.Println("Error retrieving document:", err)
+			http.Error(w, "Error retrieving document", http.StatusInternalServerError)
+			return
+		}
 
 		// Retrieves document and writes JSON response
 		retrieveDocumentData(w, doc)
@@ -465,18 +465,18 @@ func deleteDashboard(w http.ResponseWriter, r *http.Request) {
 
 	if len(dashboardID) != 0 {
 		doc, err := getDocumentByID(ctx, collection, dashboardID)
-        if err != nil {
-            if err == iterator.Done {
-                // Document not found
-                errorMessage := "Document with ID " + dashboardID + " not found"
-                http.Error(w, errorMessage, http.StatusNotFound)
-                return
-            }
-            // If trouble retrieving document
-            log.Println("Error retrieving document:", err)
-            http.Error(w, "Error retrieving document", http.StatusInternalServerError)
-            return
-        }
+		if err != nil {
+			if err == iterator.Done {
+				// Document not found
+				errorMessage := "Document with ID " + dashboardID + " not found"
+				http.Error(w, errorMessage, http.StatusNotFound)
+				return
+			}
+			// If trouble retrieving document
+			log.Println("Error retrieving document:", err)
+			http.Error(w, "Error retrieving document", http.StatusInternalServerError)
+			return
+		}
 
 		// Delete the document
 		_, err = doc.Ref.Delete(ctx)
@@ -494,7 +494,6 @@ func deleteDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
-
 
 // Checks if a value is empty, returns true if it is
 func isEmptyField(value interface{}) bool {
