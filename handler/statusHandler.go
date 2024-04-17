@@ -6,16 +6,20 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"cloud.google.com/go/firestore"
 )
 
 // StatusHandler handles the status endpoint
-func StatusHandler(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		statusGetRequest(w, r)
-	default:
-		http.Error(w, "Method not supported. Currently only GET is supported.", http.StatusNotImplemented)
-		return
+func StatusHandler() func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			statusGetRequest(w, r)
+		default:
+			http.Error(w, "Method not supported. Currently only GET is supported.", http.StatusNotImplemented)
+			return
+		}
 	}
 }
 
@@ -53,18 +57,8 @@ func statusGetRequest(w http.ResponseWriter, _ *http.Request) {
 	checkHTTPError(err)
 
 	// get the number of webhooks in the database
-	numOfWebhooks, _ := GetWebhookSize()
-
 	// Creates status struct
-	Status := utils.Status{
-		Countriesapi:   countriesApiStatusCode.StatusCode,
-		Meteoapi:       meteoApiStatusCode.StatusCode,
-		Currencyapi:    currencyApiStatusCode.StatusCode,
-		Notificationdb: notificationStatus.StatusCode,
-		Webhooks:       numOfWebhooks,
-		Version:        "v1",
-		Uptime:         upTime,
-	}
+	Status := createFormat(countriesApiStatusCode, meteoApiStatusCode, currencyApiStatusCode, notificationStatus, upTime)
 
 	// Set the content-type to be json
 	w.Header().Add("content-type", "application/json")
@@ -81,12 +75,36 @@ func statusGetRequest(w http.ResponseWriter, _ *http.Request) {
 
 }
 
+func createFormat(countriesApiStatusCode *http.Response, meteoApiStatusCode *http.Response, currencyApiStatusCode *http.Response, notificationStatus *http.Response, upTime float64) utils.Status {
+
+	numOfWebhooks, _ := GetWebhookSize(func() ([]*firestore.DocumentSnapshot, error) {
+		return client.Collection(collectionWebhooks).Documents(ctx).GetAll()
+	})
+
+	Status := utils.Status{
+		Countriesapi:   countriesApiStatusCode.StatusCode,
+		Meteoapi:       meteoApiStatusCode.StatusCode,
+		Currencyapi:    currencyApiStatusCode.StatusCode,
+		Notificationdb: notificationStatus.StatusCode,
+		Webhooks:       numOfWebhooks,
+		Version:        "v1",
+		Uptime:         upTime,
+	}
+	return Status
+}
+
 // name of collection used for webhooks
 const collectionWebhooks = "webhooks"
 
+type FirestoreClient interface {
+	Collection(path string) *firestore.CollectionRef
+}
+
+type DocumentRetriever func() ([]*firestore.DocumentSnapshot, error)
+
 // Function for getting the number of webhooks in the database
-func GetWebhookSize() (int, error) {
-	webhooks, err := client.Collection(collectionWebhooks).Documents(ctx).GetAll()
+func GetWebhookSize(getDocuments DocumentRetriever) (int, error) {
+	webhooks, err := getDocuments()
 	if err != nil {
 		return -1, err
 	}
