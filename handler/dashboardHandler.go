@@ -110,7 +110,7 @@ func DashboardFunc(w http.ResponseWriter, r *http.Request) error {
 		}
 
 		//Fetching temperature and precipitation using coordinates
-		temperature, precipitation, err := retrieveWeather(longitude, latitude, w, r)
+		temperature, precipitation, err := retrieveWeather(utils.FORECAST_API, longitude, latitude, w, r)
 		if err != nil {
 			return err
 		}
@@ -296,7 +296,7 @@ func retrieveCoordinates(apiURL, capital string, w http.ResponseWriter, r *http.
 Function retrieves coordinates (to a certain capital),
 then returns temperature and precipitation
 */
-func retrieveWeather(longitude myFloat, latitude myFloat, w http.ResponseWriter, r *http.Request) (myFloat, myFloat, error) {
+func retrieveWeather(urlAPI string, longitude myFloat, latitude myFloat, w http.ResponseWriter, r *http.Request) (myFloat, myFloat, error) {
 
 	long := strconv.FormatFloat(float64(longitude), 'f', 2, 32)
 	lat := strconv.FormatFloat(float64(latitude), 'f', 2, 32)
@@ -311,7 +311,7 @@ func retrieveWeather(longitude myFloat, latitude myFloat, w http.ResponseWriter,
 	}
 
 	//Fetching data from the forecast API
-	err := fetchURLdata(utils.FORECAST_API+"latitude="+lat+"&longitude="+long+"&hourly=temperature_2m,precipitation&forecast_days=1", w, &myWeather)
+	err := fetchURLdata(urlAPI+"/latitude="+lat+"&longitude="+long+"&hourly=temperature_2m,precipitation&forecast_days=1", w, &myWeather)
 	if err != nil {
 		return 0, 0, err
 	}

@@ -96,6 +96,40 @@ func TestFetchURLData(t *testing.T) {
 		t.Errorf("Expected value for key to be '%s', got %s", expected, err.Error())
 	}
 
+	// Create a mock HTTP server that returns an error
+	server3 := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
+	}))
+	defer server3.Close()
+
+	// Call fetchURLdata with the mock server's URL
+	var data2 interface{}
+	rw := httptest.NewRecorder()
+	err2 := fetchURLdata(server3.URL, rw, &data2)
+	if err2 == nil {
+		t.Error("expected an error, got nil")
+	}
+
+	// Create a mock HTTP server that returns an invalid JSON
+	server2 := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		rw.Write([]byte(`{invalid json}`))
+	}))
+	defer server2.Close()
+
+	// Call fetchURLdata with the second mock server's URL
+	err3 := fetchURLdata(server2.URL, rw, &data2)
+	if err3 == nil {
+		t.Error("expected an error, got nil")
+	}
+
+	// Call fetchURLdata with an invalid URL
+	var data3 interface{}
+	rw2 := httptest.NewRecorder()
+	err4 := fetchURLdata("http://invalid url", rw2, &data3)
+	if err4 == nil {
+		t.Error("expected an error, got nil")
+	}
+
 }
 
 // Test function whatTimeNow
@@ -128,7 +162,10 @@ func TestFloatFormat(t *testing.T) {
 	if floatFunc != expected {
 		t.Errorf("Expected %v, got %v", expected, floatFunc)
 	}
+
 }
+
+// Test function for retrieveCountryData
 func TestRetrieveCountryData(t *testing.T) {
 	// Start a local HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -150,6 +187,7 @@ func TestRetrieveCountryData(t *testing.T) {
 	}
 }
 
+// Test function for retrieveCoordinates
 func TestRetrieveCoordinates(t *testing.T) {
 	// Start a local HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -171,10 +209,11 @@ func TestRetrieveCoordinates(t *testing.T) {
 	}
 }
 
+// Test function for retrieveCurrencyExchangeRates
 func TestRetrieveCurrencyExchangeRates(t *testing.T) {
 	// Start a local HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		// Send response to be tested
+		// Respond with a body set by the test
 		rw.Write([]byte(`{"rates": {"USD": 1.23, "EUR": 0.89}}`))
 	}))
 	// Close the server when test finishes
@@ -189,5 +228,39 @@ func TestRetrieveCurrencyExchangeRates(t *testing.T) {
 	// Check the data
 	if currencyData["USD"] != 1.23 || currencyData["EUR"] != 0.89 {
 		t.Errorf("Expected currencyData to be {\"USD\": 1.23, \"EUR\": 0.89}, got %v", currencyData)
+	}
+}
+
+// Test function for retrieveWeather
+func TestRetrieveWeather(t *testing.T) {
+	// Create a mock HTTP server
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		// Respond with a body set by the test
+		rw.Write([]byte(`{
+            "hourly": {
+                "temperature_2m": [20.1, 21.2, 22.3],
+                "precipitation": [0.0, 0.0, 0.1]
+            }
+        }`))
+	}))
+	defer server.Close()
+
+	// Create a new HTTP response writer
+	rw := httptest.NewRecorder()
+
+	// Call retrieveWeather with the mock server's URL
+	avgTemp, avgPrecipitation, err := retrieveWeather(server.URL, 50.1234, 5.1234, rw, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check the returned average temperature and precipitation
+	expectedAvgTemp := myFloat((20.1 + 21.200001 + 22.3) / 3)
+	if avgTemp != expectedAvgTemp {
+		t.Errorf("expected average temperature to be %v, got %v", expectedAvgTemp, avgTemp)
+	}
+	expectedAvgPrecipitation := myFloat((0.0 + 0.0 + 0.1) / 3)
+	if avgPrecipitation != expectedAvgPrecipitation {
+		t.Errorf("expected average precipitation to be %v, got %v", expectedAvgPrecipitation, avgPrecipitation)
 	}
 }
