@@ -98,3 +98,53 @@ func TestCheckValidCurrencies(t *testing.T) {
 		t.Error("expected an error, got nil")
 	}
 }
+
+func TestUpdatedData(t *testing.T) {
+	// Make an empty object
+	emptyObject := &utils.Firestore{}
+	// FIll the object with data
+	filledObject := &utils.Firestore{
+		Country: "Norway",
+		IsoCode: "NO",
+		Features: utils.Features{
+			Temperature:      true,
+			Precipitation:    true,
+			Capital:          true,
+			Coordinates:      true,
+			Population:       true,
+			Area:             true,
+			TargetCurrencies: []string{"NOK", "EUR"},
+		},
+	}
+
+	// Call the function
+	updatedObject, missing, missingElements := updatedData(emptyObject, filledObject)
+
+	// Check that the fields are updated correctly
+	if updatedObject.Country != "Norway" || updatedObject.IsoCode != "NO" || updatedObject.Features.Area != true {
+		t.Errorf("The fields were not successfully updated")
+	}
+	// Check that the missing elements are correct
+	if missing || len(missingElements) != 0 {
+		t.Errorf("Did not identify missing objects correctly")
+	}
+
+	// Make the Country field empty
+	filledObject.Country = ""
+	filledObject.IsoCode = ""
+	// Call the function
+	updatedObject, missing, missingElements = updatedData(emptyObject, filledObject)
+
+	if !missing || len(missingElements) != 2 || missingElements[0] != "Country" || missingElements[1] != "IsoCode" {
+		t.Errorf("Did not identify missing objects correctly")
+	}
+
+	emptyFilledObject := &utils.Firestore{}
+
+	updatedObject, missing, missingElements = updatedData(emptyObject, emptyFilledObject)
+
+	if !missing || len(missingElements) != 3 {
+		t.Errorf("Did not identify missing objects correctly %v", missingElements)
+	}
+
+}
