@@ -42,21 +42,21 @@ type OutputDashboardWithData struct {
 	Country  string `json:"country"`
 	IsoCode  string `json:"isoCode"`
 	Features struct {
-		Temperature      myFloat            `json:"temperature"`
-		Precipitation    myFloat            `json:"precipitation"`
-		Capital          string             `json:"capital"`
-		Coordinates      Coordinates        `json:"coordinates"`
-		Population       int                `json:"population"`
-		Area             myFloat            `json:"area"`
-		TargetCurrencies map[string]myFloat //`json:"targetCurrencies"`
+		Temperature      myFloat            `json:"temperature,omitempty"`
+		Precipitation    myFloat            `json:"precipitation,omitempty"`
+		Capital          string             `json:"capital,omitempty"`
+		Coordinates      Coordinates        `json:"coordinates,omitempty"`
+		Population       int                `json:"population,omitempty"`
+		Area             myFloat            `json:"area,omitempty"`
+		TargetCurrencies map[string]myFloat `json:"targetCurrencies,omitempty"`
 	} `json:"features"`
 	LastRetrieval string `json:"lastRetrieval"`
 }
 
 // Coordinates struct that contains latitude and longitude
 type Coordinates struct {
-	Latitude  myFloat `json:"latitude"`
-	Longitude myFloat `json:"longitude"`
+	Latitude  myFloat `json:"latitude,omitempty"`
+	Longitude myFloat `json:"longitude,omitempty"`
 }
 
 // Handler function that checks if method is set to GET
@@ -290,6 +290,7 @@ func retrieveCoordinates(capital string, w http.ResponseWriter, r *http.Request)
 	//Fetching data from Geocoding API, with count 1, to retrieve first city with this name
 	err := fetchURLdata(url, w, &myCoordinates)
 	if err != nil {
+		fmt.Println("Failed to retrieve coordinates")
 		return 0, 0, err
 	}
 	//Initializes longitude and latitude values
