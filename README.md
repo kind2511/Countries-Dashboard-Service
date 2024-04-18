@@ -452,6 +452,12 @@ Body:
 * Used Firebase to minimize invocation on third-party libraries. 
 
 
+## Test 
+To run the tests run command in root folder:  go test -v ./.... Here you will see what tests are run, and if they pass or fail. 
+
+In Visual Studio code you can also go to test files and press run package tests at the top of the folder to run all implemented tests and see the % of total coverage of test for the whole program. 
+
+
 ## Deployment
 
 The service is to be deployed on an IaaS solution OpenStack using Docker. 
