@@ -4,6 +4,7 @@ import (
 	"assignment2/utils"
 	structs "assignment2/utils"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -104,6 +105,10 @@ func ValidateEvent(e string) bool {
 	return e == "REGISTER" || e == "INVOKE" || e == "CHANGE" || e == "DELETE"
 }
 
+func isDigit(c byte) bool {
+	return c >= '0' && c <= '9'
+}
+
 func postWebhook(w http.ResponseWriter, r *http.Request) {
 
 	webCollection := "webhooks"
@@ -128,6 +133,40 @@ func postWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if strings.HasPrefix(hook.Url, "http://localhost:") {
+		fmt.Println("This is a test")
+		substring := hook.Url[len("http://localhost:"):]
+		if len(substring) < 5 {
+			http.Error(w, "Localhost url is not valid", http.StatusBadRequest)
+			return
+
+		} else if substring[4] != '/' {
+			http.Error(w, "Localhost url is not valid", http.StatusBadRequest)
+			return
+		}
+
+		valid := true
+		for i := 0; i < 4; i++ {
+			fmt.Println(substring[i])
+			if i >= len(substring) || !isDigit(substring[i]) {
+				valid = false
+				break
+			}
+		}
+
+		if !valid {
+			http.Error(w, "Localhost url is not valid", http.StatusBadRequest)
+			return
+		}
+
+	} else {
+		fmt.Println("Another test")
+		check, _ := http.Get(hook.Url)
+		if check.StatusCode != http.StatusOK {
+			http.Error(w, "Url provided is not valid", http.StatusBadRequest)
+			return
+		}
+	}
 	a, err := http.Get(structs.COUNTRIES_API_ISOCODE + hook.Country)
 	if err != nil {
 		http.Error(w, "Failed to check for country data", http.StatusBadRequest)
