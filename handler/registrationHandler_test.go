@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -99,6 +100,7 @@ func TestCheckValidCurrencies(t *testing.T) {
 	}
 }
 
+// Test function UpdatedData
 func TestUpdatedData(t *testing.T) {
 	// Make an empty object
 	emptyObject := &utils.Firestore{}
@@ -135,16 +137,60 @@ func TestUpdatedData(t *testing.T) {
 	// Call the function
 	updatedObject, missing, missingElements = updatedData(emptyObject, filledObject)
 
+	// Check that the fields are updated correctly
 	if !missing || len(missingElements) != 2 || missingElements[0] != "Country" || missingElements[1] != "IsoCode" {
 		t.Errorf("Did not identify missing objects correctly")
 	}
 
+	// Make the Features field empty
 	emptyFilledObject := &utils.Firestore{}
 
+	// Call the function
 	updatedObject, missing, missingElements = updatedData(emptyObject, emptyFilledObject)
-
+	// Check that the fields are updated correctly (bools will be false, but not empty)
 	if !missing || len(missingElements) != 3 {
 		t.Errorf("Did not identify missing objects correctly %v", missingElements)
 	}
+}
 
+// Test function handleValidCountryAndCode
+func TestHandleValidCountryAndCode(t *testing.T) {
+	// Create a mock HTTP server and close when finished testing
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Write a mock response
+		if strings.Contains(r.URL.Path, "notFound") {
+			http.Error(w, "Not Found", http.StatusNotFound)
+		} else {
+			w.Write([]byte(`[{"name": {"common": "Norway"}, "cca2": "NO"}]`))
+		}
+	}))
+	defer server.Close()
+
+	// Create a mock http.ResponseWriter
+	w := httptest.NewRecorder()
+	// fill the dashboard with data
+	dashboard := utils.Dashboard{
+		Country: "Norway",
+		Isocode: "NO",
+	}
+	// Call the function
+	isocode, country, err := handleValidCountryAndCode(server.URL+"/", server.URL+"/", w, dashboard)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	// check that the isocode and country are correct
+	if isocode != "NO" || country != "Norway" {
+		t.Errorf("expected isocode to be NO and country to be Norway, got %v and %v", isocode, country)
+	}
+	// update the dashboard with a not found string for the country
+	dashboard.Country = "notFound"
+	// Call the function agaon with the updated dashboard
+	isocode2, country2, err := handleValidCountryAndCode(server.URL+"/", server.URL+"/", w, dashboard)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	// check that the isocode and country are correct
+	if isocode2 != "NO" || country2 != "Norway" {
+		t.Errorf("expected isocode to be NO and country to be Norway, got %v and %v", isocode, country)
+	}
 }

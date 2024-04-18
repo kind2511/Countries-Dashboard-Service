@@ -80,7 +80,7 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 			"\n Suggestion: Fill both or one of the fields to register a dashboard", http.StatusBadRequest)
 
 	} else { // Validate country and isocode fields
-		validIsocode, validCountry, err := handleValidCountryAndCode(w, dashboard)
+		validIsocode, validCountry, err := handleValidCountryAndCode(utils.COUNTRIES_API_NAME, utils.COUNTRIES_API_ISOCODE, w, dashboard)
 		if err != nil {
 			log.Println(w, "Invalid input: Fields 'Country' and or 'Isocode'")
 			return
@@ -119,7 +119,7 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 /*
 Functon to handle country and or isocode accordingly
 */
-func handleValidCountryAndCode(w http.ResponseWriter, s utils.Dashboard) (string, string, error) {
+func handleValidCountryAndCode(countryNameAPI string, countryISOAPI string, w http.ResponseWriter, s utils.Dashboard) (string, string, error) {
 
 	// country and isocode registration input from client
 	country := s.Country
@@ -136,7 +136,7 @@ func handleValidCountryAndCode(w http.ResponseWriter, s utils.Dashboard) (string
 	if country != "" || isocode != "" {
 
 		// HEAD request to the countries API endpoint via country input
-		url := utils.COUNTRIES_API_NAME + country
+		url := countryNameAPI + country
 		res, err = http.Head(url)
 
 		// Check if the response status code is OK, then GET the URL body
@@ -148,7 +148,7 @@ func handleValidCountryAndCode(w http.ResponseWriter, s utils.Dashboard) (string
 			log.Println("Invalid input: URL unreachable with 'country': "+country+". Checking 'isocode': "+isocode, err)
 
 			// HEAD request to the countries API endpoint via isocode input
-			url := utils.COUNTRIES_API_ISOCODE + isocode
+			url := countryISOAPI + isocode
 			res, err = http.Head(url)
 
 			// Check if the response status code is OK, then GET the URL body
