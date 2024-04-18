@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -357,17 +358,17 @@ func whatTimeNow2() string {
 
 // function to get a document based on its id field
 func getDocumentByID(ctx context.Context, collection string, dashboardID string) (*firestore.DocumentSnapshot, error) {
-    // Query documents where the 'id' field matches the provided dashboardID
-    query := client.Collection(collection).Where("id", "==", dashboardID).Limit(1)
-    iter := query.Documents(ctx)
+	// Query documents where the 'id' field matches the provided dashboardID
+	query := client.Collection(collection).Where("id", "==", dashboardID).Limit(1)
+	iter := query.Documents(ctx)
 
-    // Retrieve reference to document
-    doc, err := iter.Next()
-    if err != nil {
-        return nil, err
-    }
+	// Retrieve reference to document
+	doc, err := iter.Next()
+	if err != nil {
+		return nil, err
+	}
 
-    return doc, nil
+	return doc, nil
 }
 
 // Function to retrieve document data and write JSON response
@@ -416,18 +417,18 @@ func getDashboards(w http.ResponseWriter, r *http.Request) {
 
 	if len(dashboardID) != 0 {
 		doc, err := getDocumentByID(ctx, collection, dashboardID)
-        if err != nil {
-            if err == iterator.Done {
-                // Document not found
-                errorMessage := "Document with ID " + dashboardID + " not found"
-                http.Error(w, errorMessage, http.StatusNotFound)
-                return
-            }
-            // If trouble retrieving document
-            log.Println("Error retrieving document:", err)
-            http.Error(w, "Error retrieving document", http.StatusInternalServerError)
-            return
-        }
+		if err != nil {
+			if err == iterator.Done {
+				// Document not found
+				errorMessage := "Document with ID " + dashboardID + " not found"
+				http.Error(w, errorMessage, http.StatusNotFound)
+				return
+			}
+			// If trouble retrieving document
+			log.Println("Error retrieving document:", err)
+			http.Error(w, "Error retrieving document", http.StatusInternalServerError)
+			return
+		}
 
 		// Retrieves document and writes JSON response
 		retrieveDocumentData(w, doc)
@@ -465,18 +466,18 @@ func deleteDashboard(w http.ResponseWriter, r *http.Request) {
 
 	if len(dashboardID) != 0 {
 		doc, err := getDocumentByID(ctx, collection, dashboardID)
-        if err != nil {
-            if err == iterator.Done {
-                // Document not found
-                errorMessage := "Document with ID " + dashboardID + " not found"
-                http.Error(w, errorMessage, http.StatusNotFound)
-                return
-            }
-            // If trouble retrieving document
-            log.Println("Error retrieving document:", err)
-            http.Error(w, "Error retrieving document", http.StatusInternalServerError)
-            return
-        }
+		if err != nil {
+			if err == iterator.Done {
+				// Document not found
+				errorMessage := "Document with ID " + dashboardID + " not found"
+				http.Error(w, errorMessage, http.StatusNotFound)
+				return
+			}
+			// If trouble retrieving document
+			log.Println("Error retrieving document:", err)
+			http.Error(w, "Error retrieving document", http.StatusInternalServerError)
+			return
+		}
 
 		// Delete the document
 		_, err = doc.Ref.Delete(ctx)
@@ -494,7 +495,6 @@ func deleteDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
-
 
 // Checks if a value is empty, returns true if it is
 func isEmptyField(value interface{}) bool {
@@ -525,14 +525,28 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 	//Time is set to now
 	myObject.LastChange = time.Now()
 
-	//Reference to the document with specified id (will be changed later)
-	docRef := client.Collection(collection).Doc(myId)
+	documentExists := true
+
+	doc, err := getDocumentByID(ctx, collection, myId)
+	if err != nil {
+		documentExists = false
+	}
+
+	var docRef interface{} = nil
+	fmt.Println("---------------------------------\n-------------------------------\n------------------------------")
+
+	if documentExists {
+		//Reference to the document with specified id (will be changed later)
+		docRef = client.Collection(collection).Doc(doc.Ref.ID)
+	}
+
+	fmt.Println("---------------------------------\n-------------------------------\n------------------------------")
 
 	//If the user puts in PUT request
 	if isPut {
 		var p utils.Firestore
 		//Checks for missing elements from user input
-		_, checkIfMissingElements, missingElements := updatedData(&p, &myObject)
+		_, checkIfMissingElements, missingElements := updatedData(&p, &myObject, w)
 		if checkIfMissingElements {
 			http.Error(w, "Missing variables: "+strings.Join(missingElements, ", "), http.StatusBadRequest)
 			return nil
@@ -547,6 +561,8 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 		if myObject.IsoCode != c[0].Isocode {
 			myObject.IsoCode = c[0].Isocode
 		}
+
+		myObject.Features.TargetCurrencies = checkCurrencies(myObject.Features.TargetCurrencies, w)
 
 		//taking the data from the object and applies them to a map
 		data := map[string]interface{}{
@@ -563,58 +579,121 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 			},
 			"lastChange": time.Now(),
 		}
-		//Updates the document with the map
-		_, err := docRef.Set(ctx, data)
-		if err != nil {
-			//If document does not exist, it creates a new one
-			if status.Code(err) == codes.NotFound {
-				_, err = docRef.Create(ctx, data)
+		if docRef != nil {
+			if firestoreDocRef, ok := docRef.(*firestore.DocumentRef); ok {
+
+				//Creates a new object, that fetches data from firebase
+				var newObject utils.Firestore
+
+				//Fetching the document, checks if it exists
+				doc, err := firestoreDocRef.Get(ctx)
 				if err != nil {
-					http.Error(w, "failed to create document", http.StatusInternalServerError)
-					return nil
+					if status.Code(err) == codes.NotFound {
+						http.Error(w, "Document does not exist, cannot PATCH", http.StatusBadRequest)
+						return nil
+					}
 				}
-				//Else, there is something else wrong with it
-			} else {
-				http.Error(w, "failed to update data", http.StatusInternalServerError)
+				doc.DataTo(&newObject)
+
+				data["id"] = newObject.ID
+
+				_, err1 := firestoreDocRef.Set(ctx, data)
+				if err1 != nil {
+					http.Error(w, "failed to update data", http.StatusInternalServerError)
+					return nil
+
+				}
+			}
+		} else {
+			http.Error(w, "This is a test", http.StatusInternalServerError)
+
+			var uniqueID string
+
+			for {
+				uniqueID = utils.GenerateUID(5)
+
+				// Check if the generated ID already exists in a document
+				iter := client.Collection(collection).Where("id", "==", uniqueID).Limit(1).Documents(ctx)
+
+				doc, err := iter.Next()
+				if err == iterator.Done {
+					// No document found with current ID, continue with further processing
+					break
+				}
+				if err != nil {
+					log.Println("Error retrieving document:", err)
+					break
+				}
+				if doc != nil {
+					// ID already exists, generating a new one
+					log.Println("ID already exists...generating new one")
+					continue
+				}
+			}
+			data["id"] = uniqueID
+			_, _, err := client.Collection(collection).Add(ctx, data)
+			if err != nil {
+				http.Error(w, "Failed to add new document: "+err.Error(), http.StatusInternalServerError)
 				return nil
 			}
+
 		}
 
 		//If user put in a PATCH request
 	} else {
-		//Fetching the document, checks if it exists
-		doc, err := docRef.Get(ctx)
-		if err != nil {
-			if status.Code(err) == codes.NotFound {
-				http.Error(w, "Document does not exist, cannot PATCH", http.StatusBadRequest)
-				return nil
+		if docRef != nil {
+			if firestoreDocRef, ok := docRef.(*firestore.DocumentRef); ok {
+
+				//Creates a new object, that fetches data from firebase
+				var newObject utils.Firestore
+
+				//Fetching the document, checks if it exists
+				doc, err := firestoreDocRef.Get(ctx)
+				if err != nil {
+					if status.Code(err) == codes.NotFound {
+						http.Error(w, "Document does not exist, cannot PATCH", http.StatusBadRequest)
+						return nil
+					}
+				}
+				doc.DataTo(&newObject)
+
+				//Merges the data from firebase with user input (that has been written)
+				final, _, _ := updatedData(&newObject, &myObject, w)
+
+				var c []utils.CountryInfo
+				err1 := fetchURLdata(utils.COUNTRIES_API_NAME+final.Country, w, &c)
+				if err1 != nil {
+					http.Error(w, "Failed to retrieve country: "+final.Country, http.StatusBadRequest)
+					return nil
+				}
+				if final.IsoCode != c[0].Isocode {
+					final.IsoCode = c[0].Isocode
+				}
+
+				//Updates the document
+				_, err = firestoreDocRef.Set(ctx, map[string]interface{}{
+					"id":      newObject.ID,
+					"country": final.Country,
+					"isoCode": final.IsoCode,
+					"features": map[string]interface{}{
+						"temperature":      final.Features.Temperature,
+						"precipitation":    final.Features.Precipitation,
+						"capital":          final.Features.Capital,
+						"coordinates":      final.Features.Coordinates,
+						"population":       final.Features.Population,
+						"area":             final.Features.Area,
+						"targetCurrencies": final.Features.TargetCurrencies,
+					},
+					"lastChange": time.Now(),
+				})
+				if err != nil {
+					http.Error(w, "Failed to patch", http.StatusInternalServerError)
+					return err
+				}
 			}
-		}
-		//Creates a new object, that fetches data from firebase
-		var newObject utils.Firestore
-		doc.DataTo(&newObject)
-
-		//Merges the data from firebase with user input (that has been written)
-		final, _, _ := updatedData(&newObject, &myObject)
-
-		//Updates the document
-		_, err = docRef.Set(ctx, map[string]interface{}{
-			"country": final.Country,
-			"isoCode": final.IsoCode,
-			"features": map[string]interface{}{
-				"temperature":      final.Features.Temperature,
-				"precipitation":    final.Features.Precipitation,
-				"capital":          final.Features.Capital,
-				"coordinates":      final.Features.Coordinates,
-				"population":       final.Features.Population,
-				"area":             final.Features.Area,
-				"targetCurrencies": final.Features.TargetCurrencies,
-			},
-			"lastChange": time.Now(),
-		})
-		if err != nil {
-			http.Error(w, "Failed to patch", http.StatusInternalServerError)
-			return err
+		} else {
+			http.Error(w, "Document does not exist", http.StatusBadRequest)
+			return nil
 		}
 	}
 
@@ -625,7 +704,7 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 // will then replace with only the written in values, avoids multiple null values if they are not written in
 // returns the object with values, a bool to check if values are missing, and a string array containing all
 // names of the missing elements, to inform the user
-func updatedData(newObject *utils.Firestore, myObject *utils.Firestore) (*utils.Firestore, bool, []string) {
+func updatedData(newObject *utils.Firestore, myObject *utils.Firestore, w http.ResponseWriter) (*utils.Firestore, bool, []string) {
 	checkIfMissingElements := false
 	missingElements := make([]string, 0)
 	if !isEmptyField(myObject.Country) {
@@ -677,11 +756,45 @@ func updatedData(newObject *utils.Firestore, myObject *utils.Firestore) (*utils.
 		missingElements = append(missingElements, "Population")
 	}
 	if !isEmptyField(myObject.Features.TargetCurrencies) {
-		newObject.Features.TargetCurrencies = myObject.Features.TargetCurrencies
+		newObject.Features.TargetCurrencies = checkCurrencies(myObject.Features.TargetCurrencies, w)
 	} else {
 		checkIfMissingElements = true
 		missingElements = append(missingElements, "Target Currencies")
 	}
 	return newObject, checkIfMissingElements, missingElements
 
+}
+
+func checkCurrencies(arr []string, w http.ResponseWriter) []string {
+	uniqueCurrenciesMap := make(map[string]bool)
+	uniqueCurrenciesArr := make([]string, 0)
+
+	for _, currency := range arr {
+		if len(currency) != 3 {
+			continue
+		}
+		myCurrency := strings.ToUpper(currency)
+		if !uniqueCurrenciesMap[myCurrency] {
+			uniqueCurrenciesMap[myCurrency] = true
+
+			url := utils.CURRENCY_API + myCurrency
+			type c struct {
+				Result string `json:"result"`
+			}
+			var a c
+			err := fetchURLdata(url, w, &a)
+			if err != nil {
+				http.Error(w, "Failed to retrieve currency", http.StatusBadRequest)
+				return nil
+			}
+			if a.Result != "success" {
+				fmt.Println("Currency " + myCurrency + " did not work")
+				fmt.Println(a.Result)
+				continue
+			}
+			uniqueCurrenciesArr = append(uniqueCurrenciesArr, myCurrency)
+		}
+	}
+	fmt.Println(uniqueCurrenciesArr)
+	return uniqueCurrenciesArr
 }
