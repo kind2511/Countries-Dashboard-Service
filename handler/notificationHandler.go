@@ -17,17 +17,18 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-func NotificationHandler(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodPost:
-		postWebhook(w, r)
-	case http.MethodDelete:
-		deleteWebhook(w, r)
-
-	case http.MethodGet:
-		getWebHooks(w, r)
-	default:
-		http.Error(w, "Method "+r.Method+" not supported for "+structs.NOTIFICATION_PATH, http.StatusMethodNotAllowed)
+func NotificationHandler() func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			postWebhook(w, r)
+		case http.MethodDelete:
+			deleteWebhook(w, r)
+		case http.MethodGet:
+			getWebHooks(w, r)
+		default:
+			http.Error(w, "Method "+r.Method+" not supported for "+structs.NOTIFICATION_PATH, http.StatusMethodNotAllowed)
+		}
 	}
 }
 
