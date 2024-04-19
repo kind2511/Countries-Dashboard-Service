@@ -81,7 +81,7 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 			"\n Suggestion: Fill both or one of the fields to register a dashboard", http.StatusBadRequest)
 
 	} else { // Validate country and isocode fields
-		validIsocode, validCountry, err := handleValidCountryAndCode(w, dashboard)
+		validIsocode, validCountry, err := handleValidCountryAndCode(utils.COUNTRIES_API_NAME, utils.COUNTRIES_API_ISOCODE, w, dashboard)
 		if err != nil {
 			log.Println(w, "Invalid input: Fields 'Country' and or 'Isocode'")
 			return
@@ -91,7 +91,7 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 		if validIsocode != "" && validCountry != "" {
 
 			// Check if the target currencies are all valid values
-			validCurrencies, err := checkValidCurrencies(w, dashboard)
+			validCurrencies, err := checkValidCurrencies(utils.CURRENCY_API, w, dashboard)
 			if err != nil {
 				http.Error(w, "Error: Internal server error. "+err.Error(), http.StatusInternalServerError)
 				return
@@ -120,7 +120,7 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 /*
 Functon to handle country and or isocode accordingly
 */
-func handleValidCountryAndCode(w http.ResponseWriter, s utils.Dashboard) (string, string, error) {
+func handleValidCountryAndCode(countryNameAPI string, countryISOAPI string, w http.ResponseWriter, s utils.Dashboard) (string, string, error) {
 
 	// country and isocode registration input from client
 	country := s.Country
@@ -137,7 +137,7 @@ func handleValidCountryAndCode(w http.ResponseWriter, s utils.Dashboard) (string
 	if country != "" || isocode != "" {
 
 		// HEAD request to the countries API endpoint via country input
-		url := utils.COUNTRIES_API_NAME + country
+		url := countryNameAPI + country
 		res, err = http.Head(url)
 
 		// Check if the response status code is OK, then GET the URL body
@@ -149,7 +149,7 @@ func handleValidCountryAndCode(w http.ResponseWriter, s utils.Dashboard) (string
 			log.Println("Invalid input: URL unreachable with 'country': "+country+". Checking 'isocode': "+isocode, err)
 
 			// HEAD request to the countries API endpoint via isocode input
-			url := utils.COUNTRIES_API_ISOCODE + isocode
+			url := countryISOAPI + isocode
 			res, err = http.Head(url)
 
 			// Check if the response status code is OK, then GET the URL body
@@ -206,7 +206,7 @@ func handleValidCountryAndCode(w http.ResponseWriter, s utils.Dashboard) (string
 /*
 Functon to check valid currencies accordingly
 */
-func checkValidCurrencies(w http.ResponseWriter, d utils.Dashboard) ([]string, error) {
+func checkValidCurrencies(apiURL string, w http.ResponseWriter, d utils.Dashboard) ([]string, error) {
 
 	// Currencies from client input
 	currencies := d.RegFeatures.TargetCurrencies
@@ -240,7 +240,7 @@ func checkValidCurrencies(w http.ResponseWriter, d utils.Dashboard) ([]string, e
 	// Iterate through each currency and see if they are valid
 	for _, currency := range uniqueCurrenciesSlice {
 
-		url := utils.CURRENCY_API + currency
+		url := apiURL + currency
 
 		// Send a Get request to the currency API endpoint
 		res, err := http.Get(url)
