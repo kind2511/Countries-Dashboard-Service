@@ -3,6 +3,7 @@ package handler
 import (
 	"assignment2/utils"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -213,14 +214,12 @@ func fetchURLdata(myData string, w http.ResponseWriter, data interface{}) error 
 	//If the fetched data is from an API
 	response, err := http.Get(myData)
 	if err != nil {
-		http.Error(w, "Failed to fetch url: "+myData, http.StatusInternalServerError)
-		return err
+		return errors.New("failed to fetch url: " + myData)
 	}
 	defer response.Body.Close()
 	err = json.NewDecoder(response.Body).Decode(&data)
 	if err != nil {
-		http.Error(w, "Failed to decode url: "+myData, http.StatusInternalServerError)
-		return err
+		return errors.New("failed to decode url: " + myData)
 	}
 	//If the fetched data is from a JSON file
 	return nil

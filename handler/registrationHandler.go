@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -63,7 +65,7 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 
 	// Empty registration struct to populate
-	dashboard := utils.Dashboard{}
+	dashboard := utils.Firestore{}
 
 	// Decode registration instance
 	err := decoder.Decode(&dashboard)
@@ -73,201 +75,25 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if both fields are empty
-	if dashboard.Country == "" && dashboard.Isocode == "" {
-		log.Println("Invalid input: Fields 'Country' and 'Isocode' are empty")
+	if isEmptyField(dashboard.Country) && isEmptyField(dashboard.IsoCode) {
 		http.Error(w, "Invalid input: Fields 'Country' and 'Isocode' are empty."+
 			"\n Suggestion: Fill both or one of the fields to register a dashboard", http.StatusBadRequest)
-
-	} else { // Validate country and isocode fields
-		validIsocode, validCountry, err := handleValidCountryAndCode(w, dashboard)
-		if err != nil {
-			log.Println(w, "Invalid input: Fields 'Country' and or 'Isocode'")
-			return
-		}
-
-		// If there is returned valid country and isocode
-		if validIsocode != "" && validCountry != "" {
-
-			// Check if the target currencies are all valid values
-			validCurrencies, err := checkValidCurrencies(w, dashboard)
-			if err != nil {
-				http.Error(w, "Error: Internal server error. "+err.Error(), http.StatusInternalServerError)
-				return
-			}
-			if validCurrencies != nil {
-				log.Println("Valid input: Field values 'country': " + validCountry + " matching 'isocode': " + validIsocode + " will be registereded")
-
-				dashboard.Country = validCountry
-				dashboard.Isocode = validIsocode
-				dashboard.RegFeatures.TargetCurrencies = validCurrencies
-
-				// Post registered dashboard
-				handlePostRegistration(w, dashboard)
-
-				return
-
-			} else {
-				http.Error(w, "Detected invalid currency from 'targetCurrencies' field "+
-					"\nSuggestion: Please have all currencies be written as valid 3-letter currency code (ISO 4217)", http.StatusBadRequest)
-			}
-
-		}
-	}
-}
-
-/*
-Functon to handle country and or isocode accordingly
-*/
-func handleValidCountryAndCode(w http.ResponseWriter, s utils.Dashboard) (string, string, error) {
-
-	// country and isocode registration input from client
-	country := s.Country
-	isocode := s.Isocode
-
-	// Empty slice to hold the data from requested country
-	var apiInfo []utils.CountryInfo
-
-	// Variables for response body and error
-	var res *http.Response
-	var err error
-
-	// Fetch countries URL depending on which field has been filled and are valid.
-	if country != "" || isocode != "" {
-
-		// HEAD request to the countries API endpoint via country input
-		url := utils.COUNTRIES_API_NAME + country
-		res, err = http.Head(url)
-
-		// Check if the response status code is OK, then GET the URL body
-		if res.StatusCode == http.StatusOK {
-			log.Println("Valid 'countries' URL with country input: " + country + "...processing")
-			res, err = http.Get(url)
-
-		} else { // if the country input is invalid, check the isocode input
-			log.Println("Invalid input: URL unreachable with 'country': "+country+". Checking 'isocode': "+isocode, err)
-
-			// HEAD request to the countries API endpoint via isocode input
-			url := utils.COUNTRIES_API_ISOCODE + isocode
-			res, err = http.Head(url)
-
-			// Check if the response status code is OK, then GET the URL body
-			if res.StatusCode == http.StatusOK {
-				log.Println("Valid 'countries' URL with isocode input: " + isocode + "...processing")
-				res, err = http.Get(url)
-			} else {
-				log.Println("Invalid input: URL unreachable with 'isocode': "+isocode+" or 'country': "+country, err)
-			}
-		}
+		return
 	}
 
-	// Check if country info URL is valid
+	validCountry, validIso, err := checkCountry(dashboard.Country, dashboard.IsoCode, w)
 	if err != nil {
-		log.Println("Error: Failed to fetch country info from URL: ", err)
-		http.Error(w, "Error: Failed to fetch country info from URL", http.StatusInternalServerError)
-		return "", "", err
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	// Decode the response
-	if err := json.NewDecoder(res.Body).Decode(&apiInfo); err != nil {
-		log.Println("Error: decoding JSON from countries URL", err)
-		http.Error(w, "Error: decoding JSON "+err.Error(), http.StatusBadRequest)
-		return "", "", err
+	validCurrencies := checkCurrencies(dashboard.Features.TargetCurrencies, w)
+
+	_, checkIfMissingElements, missingElements := updatedData(&dashboard, &dashboard, w)
+	if checkIfMissingElements {
+		http.Error(w, "Missing variables: "+strings.Join(missingElements, ", "), http.StatusBadRequest)
+		return
 	}
-
-	// Handle when either the country or isocode input is a valid value matching the API's value
-	if strings.EqualFold(country, apiInfo[0].Name.Common) {
-		// Making sure that empty/ invalid isocode field is returned with the matching isocode from the country input
-		if isocode != "" || isocode == "" {
-			return apiInfo[0].Isocode, apiInfo[0].Name.Common, nil
-		}
-	} else {
-		log.Println("Invalid value: Field 'country': " + country + ", does not match " + apiInfo[0].Name.Common + " found")
-
-		// Making sure that empty/ invalid country field is returned with the matching country from the isocode input
-		if strings.ToUpper(isocode) == apiInfo[0].Isocode {
-			if country != "" || country == "" {
-				return apiInfo[0].Isocode, apiInfo[0].Name.Common, nil
-
-			}
-		} else {
-			log.Println("Invalid value: Field 'isocode': " + isocode + ", does not match" + apiInfo[0].Isocode + "found")
-			return "", "", nil
-
-		}
-	}
-
-	// If no match found
-	http.Error(w, "Invalid input: Field 'country' and or 'isocode'", http.StatusBadRequest)
-	return "", "", nil
-}
-
-/*
-Functon to check valid currencies accordingly
-*/
-func checkValidCurrencies(w http.ResponseWriter, d utils.Dashboard) ([]string, error) {
-
-	// Currencies from client input
-	currencies := d.RegFeatures.TargetCurrencies
-
-	// Convert each currency to uppercase
-	for i, currency := range currencies {
-		currencies[i] = strings.ToUpper(currency)
-	}
-
-	// Initialize an empty hashmap of string-struct pairs
-	uniqueCurrencies := make(map[string]struct{})
-
-	// Construct a new slice that will only contain unique currencies
-	uniqueCurrenciesSlice := make([]string, 0, len(currencies))
-
-	// iterate through the currnecies array to remove possible duplicates
-	for _, currency := range currencies {
-		// Skip empty strings
-		if currency == "" {
-			continue
-		}
-		// Check if the currency is already present in the map
-		if _, found := uniqueCurrencies[currency]; !found {
-			// If not found, add the currency to the map and slice
-			uniqueCurrencies[currency] = struct{}{}
-			uniqueCurrenciesSlice = append(uniqueCurrenciesSlice, currency)
-		}
-	}
-	log.Println("All possible duplicates, if any, has been removed. From", currencies, " to ", uniqueCurrenciesSlice)
-
-	// Iterate through each currency and see if they are valid
-	for _, currency := range uniqueCurrenciesSlice {
-
-		url := utils.CURRENCY_API + currency
-
-		// Send a Get request to the currency API endpoint
-		res, err := http.Get(url)
-		if err != nil {
-			// Handle error if the request fails
-			log.Println("Error: checking currency validity. ", err)
-			http.Error(w, "Error: checking currency validity", http.StatusInternalServerError)
-			return nil, err
-		}
-
-		// Check if the response status code is OK
-		if res.StatusCode == http.StatusOK {
-			//log.Println("Valid currency:", currency)
-		} else {
-			log.Println("Invalid currency:", currency)
-			return nil, err
-		}
-	}
-	// if all currencies are valid, return the values
-	return uniqueCurrenciesSlice, nil
-}
-
-func handlePostRegistration(w http.ResponseWriter, d utils.Dashboard) {
-
-	nested := d.RegFeatures
-
-	// Current formatted time
-	timeNow := whatTimeNow2()
 
 	// Generate a random ID
 	var uniqueID string
@@ -293,66 +119,40 @@ func handlePostRegistration(w http.ResponseWriter, d utils.Dashboard) {
 			continue
 		}
 	}
-
 	// Add the decoded date into Firestore
-	_, _, err := client.Collection(collection).Add(ctx,
+	_, _, err1 := client.Collection(collection).Add(ctx,
 		map[string]interface{}{
 			"id":      uniqueID,
-			"country": d.Country,
-			"isoCode": d.Isocode,
+			"country": validCountry,
+			"isoCode": validIso,
 			"features": map[string]interface{}{
-				"temperature":      nested.Temperature,
-				"precipitation":    nested.Precipitation,
-				"capital":          nested.Capital,
-				"coordinates":      nested.Coordinates,
-				"population":       nested.Population,
-				"area":             nested.Area,
-				"targetCurrencies": nested.TargetCurrencies,
+				"temperature":      dashboard.Features.Temperature,
+				"precipitation":    dashboard.Features.Precipitation,
+				"capital":          dashboard.Features.Capital,
+				"coordinates":      dashboard.Features.Coordinates,
+				"population":       dashboard.Features.Population,
+				"area":             dashboard.Features.Area,
+				"targetCurrencies": validCurrencies,
 			},
-			"lastChanged": timeNow,
+			"lastChanged": time.Now(),
 		})
-	//
-	if err != nil {
-		http.Error(w, "Failed to add document to Firestore", http.StatusInternalServerError)
-		log.Println("Failed to add document to Firestore:", err)
+	if err1 != nil {
+		http.Error(w, "Failed to add document", http.StatusInternalServerError)
 		return
 	} else {
-
-		// Returns document ID and time last updated in body if the configuration was registered successfully
-		response := utils.DashboardResponse{
+		response := struct {
+			ID         string `json:"id"`
+			Lastchange string `json:"lastChanged"`
+		}{
 			ID:         uniqueID,
-			LastChange: timeNow,
+			Lastchange: whatTimeNow(),
 		}
-
-		// Encode the repsonse in JSON format
-		responseJSON, err := json.Marshal(response)
-		if err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		w.Header().Set("Content-type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "failed to encode result", http.StatusInternalServerError)
 			return
 		}
-
-		// Set content type header
-		w.Header().Set("Content-Type", "application/json")
-
-		// Write the response JSON and return appropriate status code
-		w.WriteHeader(http.StatusCreated)
-		w.Write(responseJSON)
-
-		log.Println("Document added to collection. Identifier of return document: ", uniqueID)
-		return
 	}
-}
-
-/*
-Function that takes the time now, and shows it in correct format
-*/
-func whatTimeNow2() string {
-	currentTime := time.Now()
-	timeLayout := "2006-01-02 15:04" //YYYYMMDD HH:mm
-
-	formattedTime := currentTime.Format(timeLayout)
-	return formattedTime
-
 }
 
 // function to get a document based on its id field
@@ -415,7 +215,7 @@ func getDashboards(w http.ResponseWriter, r *http.Request) {
 	dashboardID := elem[4]
 
 	if len(dashboardID) != 0 {
-		doc, err := getDocumentByID(ctx, collection, dashboardID)
+		doc, err := utils.getDocumentByID(ctx, collection, dashboardID)
 		if err != nil {
 			if err == iterator.Done {
 				// Document not found
@@ -761,33 +561,99 @@ func updatedData(newObject *utils.Firestore, myObject *utils.Firestore, w http.R
 
 }
 
+// Function to check if currencies are valid. Will make them capitalized, '
+//
+//	and exclude the currencies that do not have a valid value
 func checkCurrencies(arr []string, w http.ResponseWriter) []string {
+
+	//Making a map that contains a bool, if the element has already
+	//been included or not
 	uniqueCurrenciesMap := make(map[string]bool)
+
+	//Making a new array which will contain the valid currencies
 	uniqueCurrenciesArr := make([]string, 0)
 
+	//Going through all currencies in the array
 	for _, currency := range arr {
+		//If the length of the currency is not 3, it is not valid,
+		//and will continue to next element in array
 		if len(currency) != 3 {
 			continue
 		}
+		//Capitalizing the letters in the currency
 		myCurrency := strings.ToUpper(currency)
+
+		//If it hasn't been discovered already
 		if !uniqueCurrenciesMap[myCurrency] {
 			uniqueCurrenciesMap[myCurrency] = true
 
+			//Url for currency api with said currency
 			url := utils.CURRENCY_API + myCurrency
 			type c struct {
 				Result string `json:"result"`
 			}
 			var a c
+
+			//Fetching data from currency api, and putting the data into the struct
 			err := fetchURLdata(url, w, &a)
 			if err != nil {
 				http.Error(w, "Failed to retrieve currency", http.StatusBadRequest)
 				return nil
 			}
+			//If result is not success (such as error), it will print message to user, and continue to next element
 			if a.Result != "success" {
+				log.Println("Currency: " + myCurrency + " is not valid, is being excluded")
 				continue
 			}
+			//Appends currency to the array
 			uniqueCurrenciesArr = append(uniqueCurrenciesArr, myCurrency)
 		}
 	}
+	//Returns array with unique and valid currencies, getting rid of duplicates
 	return uniqueCurrenciesArr
+}
+
+//Function that makes sure both country name and isocode matches
+
+func checkCountry(countryName string, isoCode string, w http.ResponseWriter) (string, string, error) {
+
+	//Creates variables for country name (if country is found), and url with country name for api
+	countryNameFound := true
+	var CountryWithName []utils.CountryInfo
+	countryUrl := url.QueryEscape(countryName)
+	urlName := fmt.Sprintf(utils.COUNTRIES_API_NAME+"%s", countryUrl)
+
+	//Creates variables for iso code (if country exists), and url with iso code for api
+	isoCountryFound := true
+	var CountryWithIso []utils.CountryInfo
+	isoUrl := url.QueryEscape(isoCode)
+	urlIso := fmt.Sprintf(utils.COUNTRIES_API_ISOCODE+"%s", isoUrl)
+
+	//Fetching data from country api and putting it in a struct array
+	err := fetchURLdata(urlName, w, &CountryWithName)
+
+	//If there is no such country, bool is set to false
+	if err != nil {
+		countryNameFound = false
+	}
+
+	//Fetching data from country api and putting it in a struct array
+	err1 := fetchURLdata(urlIso, w, &CountryWithIso)
+
+	//If there is no such country, bool is set to false
+	if err1 != nil {
+		isoCountryFound = false
+	}
+
+	//If countryname is a valid country, returns said data from Api with country name
+	if countryNameFound {
+		return CountryWithName[0].Name.Common, CountryWithName[0].Isocode, nil
+		//If countryname is not valid, but isocode is, it will return data from Api with Iso code
+	} else if !countryNameFound && isoCountryFound {
+		return CountryWithIso[0].Name.Common, CountryWithIso[0].Isocode, nil
+		//Else, it will return blank strings, and an error message
+	} else {
+		return "", "", errors.New("no valid countries")
+	}
+
 }
