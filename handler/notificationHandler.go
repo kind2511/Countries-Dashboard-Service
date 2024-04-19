@@ -239,29 +239,25 @@ Invokes the web service to trigger event
 // REGISTER: webhook is invoked if a new congifuration is registered
 // CHANGE: webhook is invoked if configuration is modified
 // DELETE: webhook is invoked if configuration is deleted
-// INVOKE: webhooks is invoked id dashboard is retrieved (i.e populated with values)
+// INVOKE: webhooks is invoked if dashboard is retrieved (i.e populated with values)
 
 /*
 Handles the invocation of events
 */
-func invocationHandler(w http.ResponseWriter, r *http.Request, event string, country string) {
+func invocationHandler(w http.ResponseWriter, event string, country string) {
 
 	switch event {
 	case "REGISTER":
 		triggerEvent(w, event, country)
-		log.Println("Event " + event + " triggered...")
 
 	case "CHANGE":
 		triggerEvent(w, event, country)
-		log.Println(event + "event triggered...")
 
 	case "DELETE":
 		triggerEvent(w, event, country)
-		log.Println(event + "event triggered...")
 
 	case "INVOKE":
 		triggerEvent(w, event, country)
-		log.Println(event + "event triggered...")
 
 	default:
 		http.Error(w, "No webhook invocation", http.StatusNotFound)
@@ -273,6 +269,9 @@ func invocationHandler(w http.ResponseWriter, r *http.Request, event string, cou
 Handles the event triggers
 */
 func triggerEvent(w http.ResponseWriter, event string, country string) {
+
+	log.Println(event + " event triggered...")
+
 	webhookCollection := "webhooks"
 
 	// retrieve the webhooks which will be triggered by the conditions
@@ -313,6 +312,9 @@ func callUrl(w http.ResponseWriter, hook utils.WebhookInvokeMessage) {
 	event := hook.Event
 	country := hook.Country
 
+	log.Println("Attempting invocation of URL " + url + " with content Country:'" +
+		country + "' and Event:'" + event + "'.")
+
 	// Set current time
 	timeNow := whatTimeNow2()
 	hook.Time = timeNow
@@ -331,8 +333,6 @@ func callUrl(w http.ResponseWriter, hook utils.WebhookInvokeMessage) {
 		http.Error(w, "Error creating HTTP request", http.StatusInternalServerError)
 		return
 	}
-
-	log.Println("Attempting invocation of URL " + url + " with content Country:'" + country + "' and Event:'" + event + "'.")
 
 	// Set content-Type header
 	req.Header.Set("Content-Type", "application/json")
@@ -361,6 +361,7 @@ func callUrl(w http.ResponseWriter, hook utils.WebhookInvokeMessage) {
 Checks if a event has been triggered by the handlers
 */
 func checkWebhook(isocode string) bool {
+	log.Println(isocode)
 
 	country := isocode
 

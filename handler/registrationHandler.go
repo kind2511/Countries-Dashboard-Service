@@ -109,7 +109,7 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 				if !checkWebhook(validIsocode) {
 					log.Println("No event triggered...")
 				} else {
-					invocationHandler(w, r, "REGISTER", validIsocode)
+					invocationHandler(w, "REGISTER", validIsocode)
 				}
 
 				return
@@ -496,6 +496,7 @@ func deleteDashboard(w http.ResponseWriter, r *http.Request) {
 
 		// Return success message
 		w.WriteHeader(http.StatusNoContent)
+
 	} else {
 		// If Dashboard ID is not provided
 		http.Error(w, "Dashboard ID not provided", http.StatusBadRequest)
@@ -591,7 +592,7 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 		if !checkWebhook(myObject.IsoCode) {
 			log.Println("No event triggered...")
 		} else {
-			invocationHandler(w, r, "CHANGE", myObject.IsoCode)
+			invocationHandler(w, "CHANGE", myObject.IsoCode)
 		}
 
 		//If user put in a PATCH request
@@ -635,7 +636,7 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 		if !checkWebhook(final.IsoCode) {
 			log.Println("No event triggered...")
 		} else {
-			invocationHandler(w, r, "CHANGE", final.IsoCode)
+			invocationHandler(w, "CHANGE", final.IsoCode)
 		}
 	}
 
