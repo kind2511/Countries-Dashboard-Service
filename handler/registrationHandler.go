@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -81,7 +80,7 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 			"\n Suggestion: Fill both or one of the fields to register a dashboard", http.StatusBadRequest)
 
 	} else { // Validate country and isocode fields
-		validIsocode, validCountry, err := handleValidCountryAndCode(utils.COUNTRIES_API_NAME, utils.COUNTRIES_API_ISOCODE, w, dashboard)
+		validIsocode, validCountry, err := handleValidCountryAndCode(w, dashboard)
 		if err != nil {
 			log.Println(w, "Invalid input: Fields 'Country' and or 'Isocode'")
 			return
@@ -91,7 +90,7 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 		if validIsocode != "" && validCountry != "" {
 
 			// Check if the target currencies are all valid values
-			validCurrencies, err := checkValidCurrencies(utils.CURRENCY_API, w, dashboard)
+			validCurrencies, err := checkValidCurrencies(w, dashboard)
 			if err != nil {
 				http.Error(w, "Error: Internal server error. "+err.Error(), http.StatusInternalServerError)
 				return
@@ -127,7 +126,7 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 /*
 Functon to handle country and or isocode accordingly
 */
-func handleValidCountryAndCode(countryNameAPI string, countryISOAPI string, w http.ResponseWriter, s utils.Dashboard) (string, string, error) {
+func handleValidCountryAndCode(w http.ResponseWriter, s utils.Dashboard) (string, string, error) {
 
 	// country and isocode registration input from client
 	country := s.Country
@@ -144,7 +143,7 @@ func handleValidCountryAndCode(countryNameAPI string, countryISOAPI string, w ht
 	if country != "" || isocode != "" {
 
 		// HEAD request to the countries API endpoint via country input
-		url := countryNameAPI + country
+		url := utils.COUNTRIES_API_NAME + country
 		res, err = http.Head(url)
 
 		// Check if the response status code is OK, then GET the URL body
@@ -156,7 +155,7 @@ func handleValidCountryAndCode(countryNameAPI string, countryISOAPI string, w ht
 			log.Println("Invalid input: URL unreachable with 'country': "+country+". Checking 'isocode': "+isocode, err)
 
 			// HEAD request to the countries API endpoint via isocode input
-			url := countryISOAPI + isocode
+			url := utils.COUNTRIES_API_ISOCODE + isocode
 			res, err = http.Head(url)
 
 			// Check if the response status code is OK, then GET the URL body
@@ -213,7 +212,7 @@ func handleValidCountryAndCode(countryNameAPI string, countryISOAPI string, w ht
 /*
 Functon to check valid currencies accordingly
 */
-func checkValidCurrencies(apiURL string, w http.ResponseWriter, d utils.Dashboard) ([]string, error) {
+func checkValidCurrencies(w http.ResponseWriter, d utils.Dashboard) ([]string, error) {
 
 	// Currencies from client input
 	currencies := d.RegFeatures.TargetCurrencies
@@ -247,7 +246,7 @@ func checkValidCurrencies(apiURL string, w http.ResponseWriter, d utils.Dashboar
 	// Iterate through each currency and see if they are valid
 	for _, currency := range uniqueCurrenciesSlice {
 
-		url := apiURL + currency
+		url := utils.CURRENCY_API + currency
 
 		// Send a Get request to the currency API endpoint
 		res, err := http.Get(url)
@@ -542,14 +541,11 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 	}
 
 	var docRef interface{} = nil
-	fmt.Println("---------------------------------\n-------------------------------\n------------------------------")
 
 	if documentExists {
 		//Reference to the document with specified id (will be changed later)
 		docRef = client.Collection(collection).Doc(doc.Ref.ID)
 	}
-
-	fmt.Println("---------------------------------\n-------------------------------\n------------------------------")
 
 	//If the user puts in PUT request
 	if isPut {
@@ -811,13 +807,10 @@ func checkCurrencies(arr []string, w http.ResponseWriter) []string {
 				return nil
 			}
 			if a.Result != "success" {
-				fmt.Println("Currency " + myCurrency + " did not work")
-				fmt.Println(a.Result)
 				continue
 			}
 			uniqueCurrenciesArr = append(uniqueCurrenciesArr, myCurrency)
 		}
 	}
-	fmt.Println(uniqueCurrenciesArr)
 	return uniqueCurrenciesArr
 }

@@ -194,7 +194,6 @@ func DashboardFunc(w http.ResponseWriter, r *http.Request) error {
 
 		//Sets header, and encodes the result
 		w.Header().Set("Content-type", "application/json")
-
 		if err := json.NewEncoder(w).Encode(Result); err != nil {
 			http.Error(w, "Failed to encode result", http.StatusInternalServerError)
 			return err
@@ -231,7 +230,7 @@ func fetchURLdata(myData string, w http.ResponseWriter, data interface{}) error 
 /*
 Function will return population, capital, currency and area on a certain country
 */
-func retrieveCountryData(apiURL, country string, w http.ResponseWriter, r *http.Request) (int, string, string, myFloat, error) {
+func retrieveCountryData(apiURL string, country string, w http.ResponseWriter, r *http.Request) (int, string, string, myFloat, error) {
 
 	myCountry := country
 
@@ -246,10 +245,10 @@ func retrieveCountryData(apiURL, country string, w http.ResponseWriter, r *http.
 
 	countryUrl := url.QueryEscape(myCountry)
 
-	url := fmt.Sprintf(utils.COUNTRIES_API_NAME+"%s", countryUrl)
+	url := fmt.Sprintf(apiURL+"name/%s", countryUrl)
 
 	//Fetches data from specified country
-	err := fetchURLdata(apiURL+"name/"+myCountry, w, &chosenCountry)
+	err := fetchURLdata(url, w, &chosenCountry)
 	if err != nil {
 		return 0, "", "", 0, err
 	}
@@ -292,12 +291,12 @@ func retrieveCoordinates(apiURL, capital string, w http.ResponseWriter, r *http.
 
 	capitalUrl := url.QueryEscape(capital)
 
-	url := fmt.Sprintf(utils.GEOCODING_API+"%s"+"&count=1", capitalUrl)
+	url := fmt.Sprintf(apiURL+"%s"+"&count=1", capitalUrl)
 
 	//Fetching data from Geocoding API, with count 1, to retrieve first city with this name
-	err := fetchURLdata(apiURL+capital+"&count=1", w, &myCoordinates)
+	err := fetchURLdata(url, w, &myCoordinates)
 	if err != nil {
-		fmt.Println("Failed to retrieve coordinates")
+		http.Error(w, "Failed to retrieve coordinates", http.StatusInternalServerError)
 		return 0, 0, err
 	}
 	//Initializes longitude and latitude values
@@ -333,7 +332,7 @@ func retrieveWeather(urlAPI string, longitude myFloat, latitude myFloat, w http.
 	}
 
 	//Fetching data from the forecast API
-	err := fetchURLdata(urlAPI+"/latitude="+lat+"&longitude="+long+"&hourly=temperature_2m,precipitation&forecast_days=1", w, &myWeather)
+	err := fetchURLdata(urlAPI+"latitude="+lat+"&longitude="+long+"&hourly=temperature_2m,precipitation&forecast_days=1", w, &myWeather)
 	if err != nil {
 		return 0, 0, err
 	}
