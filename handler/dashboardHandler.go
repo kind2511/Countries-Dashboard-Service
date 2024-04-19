@@ -2,11 +2,15 @@ package handler
 
 import (
 	"assignment2/utils"
-	"context"
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
+
+	"google.golang.org/api/iterator"
 )
 
 // Own float type, either float32 or float64, whatever we see fit
@@ -17,17 +21,17 @@ The dashboard that is received from dashboards,
 checking if certain data should be implemented and fetched
 */
 type Recieved_Dashboard struct {
-	Id       int    `json:"id"`
+	Id       string `json:"id"`
 	Country  string `json:"country"`
 	IsoCode  string `json:"isoCode"`
 	Features struct {
-		Temperature      bool     `json:"temperature"`
-		Precipitation    bool     `json:"precipitation"`
-		Capital          bool     `json:"capital"`
-		Coordinates      bool     `json:"coordinates"`
-		Population       bool     `json:"population"`
-		Area             bool     `json:"area"`
-		TargetCurrencies []string `json:"targetCurrencies"`
+		Temperature      bool     `json:"temperature, omitempty"`
+		Precipitation    bool     `json:"precipitation, omitempty"`
+		Capital          bool     `json:"capital, omitempty"`
+		Coordinates      bool     `json:"coordinates, omitempty"`
+		Population       bool     `json:"population, omitempty"`
+		Area             bool     `json:"area, omitempty"`
+		TargetCurrencies []string `json:"targetCurrencies, omitempty"`
 	} `json:"features"`
 }
 
@@ -38,21 +42,21 @@ type OutputDashboardWithData struct {
 	Country  string `json:"country"`
 	IsoCode  string `json:"isoCode"`
 	Features struct {
-		Temperature      myFloat            `json:"temperature"`
-		Precipitation    myFloat            `json:"precipitation"`
-		Capital          string             `json:"capital"`
-		Coordinates      Coordinates        `json:"coordinates"`
-		Population       int                `json:"population"`
-		Area             myFloat            `json:"area"`
-		TargetCurrencies map[string]myFloat //`json:"targetCurrencies"`
+		Temperature      myFloat            `json:"temperature,omitempty"`
+		Precipitation    myFloat            `json:"precipitation,omitempty"`
+		Capital          string             `json:"capital,omitempty"`
+		Coordinates      Coordinates        `json:"coordinates,omitempty"`
+		Population       int                `json:"population,omitempty"`
+		Area             myFloat            `json:"area,omitempty"`
+		TargetCurrencies map[string]myFloat `json:"targetCurrencies,omitempty"`
 	} `json:"features"`
 	LastRetrieval string `json:"lastRetrieval"`
 }
 
 // Coordinates struct that contains latitude and longitude
 type Coordinates struct {
-	Latitude  myFloat `json:"latitude"`
-	Longitude myFloat `json:"longitude"`
+	Latitude  myFloat `json:"latitude,omitempty"`
+	Longitude myFloat `json:"longitude,omitempty"`
 }
 
 // Handler function that checks if method is set to GET
@@ -75,17 +79,25 @@ func DashboardFunc(w http.ResponseWriter, r *http.Request) error {
 	//If the id
 	if len(myId) != 0 {
 
-		query := client.Collection(collection).Where("id", "==", myId).Documents(context.Background())
-
-		docs, err := query.GetAll()
+		doc, err := getDocumentByID(ctx, collection, myId)
 		if err != nil {
-			// Handle the error
-			return err
+			if err == iterator.Done {
+				// Document not found
+				errorMessage := "Document with ID " + myId + " not found"
+				http.Error(w, errorMessage, http.StatusNotFound)
+				return nil
+			}
+			// If trouble retrieving document
+			log.Println("Error retrieving document:", err)
+			http.Error(w, "Error retrieving document", http.StatusInternalServerError)
+			return nil
 		}
 
 		var myObject Recieved_Dashboard
-		if err := docs[0].DataTo(&myObject); err != nil {
-			return err
+		if err := doc.DataTo(&myObject); err != nil {
+			log.Println("Error retrieving document data:", err)
+			http.Error(w, "Error retrieving document data", http.StatusInternalServerError)
+			return nil
 		}
 
 		//Fetching variables from functions
@@ -225,8 +237,12 @@ func retrieveCountryData(country string, w http.ResponseWriter, r *http.Request)
 	}
 	var chosenCountry []Country
 
+	countryUrl := url.QueryEscape(myCountry)
+
+	url := fmt.Sprintf(utils.COUNTRIES_API_NAME+"%s", countryUrl)
+
 	//Fetches data from specified country
-	err := fetchURLdata(utils.COUNTRIES_API+"name/"+myCountry, w, &chosenCountry)
+	err := fetchURLdata(url, w, &chosenCountry)
 	if err != nil {
 		return 0, "", "", 0, err
 	}
@@ -266,9 +282,15 @@ func retrieveCoordinates(capital string, w http.ResponseWriter, r *http.Request)
 	var myCoordinates struct {
 		Result []Coordinates `json:"results"`
 	}
+
+	capitalUrl := url.QueryEscape(capital)
+
+	url := fmt.Sprintf(utils.GEOCODING_API+"%s"+"&count=1", capitalUrl)
+
 	//Fetching data from Geocoding API, with count 1, to retrieve first city with this name
-	err := fetchURLdata(utils.GEOCODING_API+capital+"&count=1", w, &myCoordinates)
+	err := fetchURLdata(url, w, &myCoordinates)
 	if err != nil {
+		fmt.Println("Failed to retrieve coordinates")
 		return 0, 0, err
 	}
 	//Initializes longitude and latitude values

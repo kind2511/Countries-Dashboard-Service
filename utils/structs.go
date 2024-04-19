@@ -73,6 +73,7 @@ type WebhookInvokeMessage struct {
 
 type Firestore struct {
 	ID         string    `json:id`
+	ID         string    `json:id`
 	Country    string    `json:"country"`
 	Features   Features  `json:"features"`
 	IsoCode    string    `json:"isoCode"`
