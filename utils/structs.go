@@ -63,8 +63,16 @@ type WebhookGetResponse struct {
 	Event   string `json:"event"`
 }
 
+type WebhookInvokeMessage struct {
+	Id      string `json:"id"`
+	Url     string `json:"url"`
+	Country string `json:"country"`
+	Event   string `json:"event"`
+	Time    string `json:"time"`
+}
+
 type Firestore struct {
-	ID		   string    `json:id`
+	ID         string    `json:id`
 	Country    string    `json:"country"`
 	Features   Features  `json:"features"`
 	IsoCode    string    `json:"isoCode"`
@@ -72,12 +80,12 @@ type Firestore struct {
 }
 
 type Features struct {
-	Temperature      bool    `json:"temperature"`
-	Precipitation    bool    `json:"precipitation"`
-	Capital          bool    `json:"capital"`
-	Coordinates      bool    `json:"coordinates"`
-	Population       bool    `json:"population"`
-	Area             bool    `json:"area"`
+	Temperature      bool     `json:"temperature"`
+	Precipitation    bool     `json:"precipitation"`
+	Capital          bool     `json:"capital"`
+	Coordinates      bool     `json:"coordinates"`
+	Population       bool     `json:"population"`
+	Area             bool     `json:"area"`
 	TargetCurrencies []string `json:"targetCurrencies"`
 }
 

@@ -105,6 +105,13 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 				// Post registered dashboard
 				handlePostRegistration(w, dashboard)
 
+				// Trigger event if registered configuration has a registered webhook to invoke
+				if !checkWebhook(validIsocode) {
+					log.Println("No event triggered...")
+				} else {
+					invocationHandler(w, r, "REGISTER", validIsocode)
+				}
+
 				return
 
 			} else {
@@ -338,7 +345,8 @@ func handlePostRegistration(w http.ResponseWriter, d utils.Dashboard) {
 		w.WriteHeader(http.StatusCreated)
 		w.Write(responseJSON)
 
-		log.Println("Document added to collection. Identifier of return document: ", uniqueID)
+		log.Println("Document added to collection. Identifier of return document: " + uniqueID + "\n")
+
 		return
 	}
 }
@@ -357,17 +365,17 @@ func whatTimeNow2() string {
 
 // function to get a document based on its id field
 func getDocumentByID(ctx context.Context, collection string, dashboardID string) (*firestore.DocumentSnapshot, error) {
-    // Query documents where the 'id' field matches the provided dashboardID
-    query := client.Collection(collection).Where("id", "==", dashboardID).Limit(1)
-    iter := query.Documents(ctx)
+	// Query documents where the 'id' field matches the provided dashboardID
+	query := client.Collection(collection).Where("id", "==", dashboardID).Limit(1)
+	iter := query.Documents(ctx)
 
-    // Retrieve reference to document
-    doc, err := iter.Next()
-    if err != nil {
-        return nil, err
-    }
+	// Retrieve reference to document
+	doc, err := iter.Next()
+	if err != nil {
+		return nil, err
+	}
 
-    return doc, nil
+	return doc, nil
 }
 
 // Function to retrieve document data and write JSON response
@@ -376,7 +384,7 @@ func retrieveDocumentData(w http.ResponseWriter, doc *firestore.DocumentSnapshot
 	var originalDoc utils.Firestore
 	if err := doc.DataTo(&originalDoc); err != nil {
 		log.Println("Error retrieving document data:", err)
-		http.Error(w, "Error retrieving document data", http.StatusInternalServerError)
+		http.Error(w, "Error retrieving document data ", http.StatusInternalServerError)
 		return
 	}
 
@@ -416,18 +424,18 @@ func getDashboards(w http.ResponseWriter, r *http.Request) {
 
 	if len(dashboardID) != 0 {
 		doc, err := getDocumentByID(ctx, collection, dashboardID)
-        if err != nil {
-            if err == iterator.Done {
-                // Document not found
-                errorMessage := "Document with ID " + dashboardID + " not found"
-                http.Error(w, errorMessage, http.StatusNotFound)
-                return
-            }
-            // If trouble retrieving document
-            log.Println("Error retrieving document:", err)
-            http.Error(w, "Error retrieving document", http.StatusInternalServerError)
-            return
-        }
+		if err != nil {
+			if err == iterator.Done {
+				// Document not found
+				errorMessage := "Document with ID " + dashboardID + " not found"
+				http.Error(w, errorMessage, http.StatusNotFound)
+				return
+			}
+			// If trouble retrieving document
+			log.Println("Error retrieving document:", err)
+			http.Error(w, "Error retrieving document", http.StatusInternalServerError)
+			return
+		}
 
 		// Retrieves document and writes JSON response
 		retrieveDocumentData(w, doc)
@@ -465,18 +473,18 @@ func deleteDashboard(w http.ResponseWriter, r *http.Request) {
 
 	if len(dashboardID) != 0 {
 		doc, err := getDocumentByID(ctx, collection, dashboardID)
-        if err != nil {
-            if err == iterator.Done {
-                // Document not found
-                errorMessage := "Document with ID " + dashboardID + " not found"
-                http.Error(w, errorMessage, http.StatusNotFound)
-                return
-            }
-            // If trouble retrieving document
-            log.Println("Error retrieving document:", err)
-            http.Error(w, "Error retrieving document", http.StatusInternalServerError)
-            return
-        }
+		if err != nil {
+			if err == iterator.Done {
+				// Document not found
+				errorMessage := "Document with ID " + dashboardID + " not found"
+				http.Error(w, errorMessage, http.StatusNotFound)
+				return
+			}
+			// If trouble retrieving document
+			log.Println("Error retrieving document:", err)
+			http.Error(w, "Error retrieving document", http.StatusInternalServerError)
+			return
+		}
 
 		// Delete the document
 		_, err = doc.Ref.Delete(ctx)
@@ -494,7 +502,6 @@ func deleteDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
-
 
 // Checks if a value is empty, returns true if it is
 func isEmptyField(value interface{}) bool {
@@ -580,6 +587,13 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 			}
 		}
 
+		// Trigger event if registered configuration has a registered webhook to invoke
+		if !checkWebhook(myObject.IsoCode) {
+			log.Println("No event triggered...")
+		} else {
+			invocationHandler(w, r, "CHANGE", myObject.IsoCode)
+		}
+
 		//If user put in a PATCH request
 	} else {
 		//Fetching the document, checks if it exists
@@ -615,6 +629,13 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 		if err != nil {
 			http.Error(w, "Failed to patch", http.StatusInternalServerError)
 			return err
+		}
+
+		// Trigger event if registered configuration has a registered webhook to invoke
+		if !checkWebhook(final.IsoCode) {
+			log.Println("No event triggered...")
+		} else {
+			invocationHandler(w, r, "CHANGE", final.IsoCode)
 		}
 	}
 
