@@ -8,32 +8,12 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"time"
 
 	"google.golang.org/api/iterator"
 )
 
 // Own float type, either float32 or float64, whatever we see fit
 type myFloat float32
-
-/*
-The dashboard that is received from dashboards,
-checking if certain data should be implemented and fetched
-*/
-type Recieved_Dashboard struct {
-	Id       string `json:"id"`
-	Country  string `json:"country"`
-	IsoCode  string `json:"isoCode"`
-	Features struct {
-		Temperature      bool     `json:"temperature, omitempty"`
-		Precipitation    bool     `json:"precipitation, omitempty"`
-		Capital          bool     `json:"capital, omitempty"`
-		Coordinates      bool     `json:"coordinates, omitempty"`
-		Population       bool     `json:"population, omitempty"`
-		Area             bool     `json:"area, omitempty"`
-		TargetCurrencies []string `json:"targetCurrencies, omitempty"`
-	} `json:"features"`
-}
 
 /*
 Struct that will display the information in each dasahboard
@@ -86,7 +66,7 @@ func DashboardFunc(w http.ResponseWriter, r *http.Request) error {
 	//If the id
 	if len(myId) != 0 {
 
-		doc, err := getDocumentByID(ctx, collection, myId)
+		doc, err := GetDocumentByID(ctx, collection, myId)
 		if err != nil {
 			if err == iterator.Done {
 				// Document not found
@@ -100,7 +80,7 @@ func DashboardFunc(w http.ResponseWriter, r *http.Request) error {
 			return nil
 		}
 
-		var myObject Recieved_Dashboard
+		var myObject utils.Dashboard_Get
 		if err := doc.DataTo(&myObject); err != nil {
 			log.Println("Error retrieving document data:", err)
 			http.Error(w, "Error retrieving document data", http.StatusInternalServerError)
@@ -190,7 +170,7 @@ func DashboardFunc(w http.ResponseWriter, r *http.Request) error {
 		Result.Features.TargetCurrencies = c
 
 		//Time for last retrieval being assigned using formatted time
-		Result.LastRetrieval = whatTimeNow()
+		Result.LastRetrieval = utils.WhatTimeNow()
 
 		//Sets header, and encodes the result
 		w.Header().Set("Content-type", "application/json")
@@ -199,32 +179,13 @@ func DashboardFunc(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 
+	} else {
+
+		http.Error(w, "Needs an Id after endpoint to be used", http.StatusBadRequest)
+		return nil
 	}
 
 	return nil
-}
-
-/*
-Retrieves data from URL
-*/
-
-func fetchURLdata(myData string, w http.ResponseWriter, data interface{}) error {
-
-	//If the fetched data is from an API
-	response, err := http.Get(myData)
-	if err != nil {
-		http.Error(w, "Failed to fetch url: "+myData, http.StatusInternalServerError)
-		return err
-	}
-	defer response.Body.Close()
-	err = json.NewDecoder(response.Body).Decode(&data)
-	if err != nil {
-		http.Error(w, "Failed to decode url: "+myData, http.StatusInternalServerError)
-		return err
-	}
-	//If the fetched data is from a JSON file
-	return nil
-
 }
 
 /*
@@ -248,7 +209,7 @@ func retrieveCountryData(apiURL string, country string, w http.ResponseWriter, r
 	url := fmt.Sprintf(apiURL+"name/%s", countryUrl)
 
 	//Fetches data from specified country
-	err := fetchURLdata(url, w, &chosenCountry)
+	err := utils.FetchURLdata(url, w, &chosenCountry)
 	if err != nil {
 		return 0, "", "", 0, err
 	}
@@ -294,7 +255,7 @@ func retrieveCoordinates(apiURL, capital string, w http.ResponseWriter, r *http.
 	url := fmt.Sprintf(apiURL+"%s"+"&count=1", capitalUrl)
 
 	//Fetching data from Geocoding API, with count 1, to retrieve first city with this name
-	err := fetchURLdata(url, w, &myCoordinates)
+	err := utils.FetchURLdata(url, w, &myCoordinates)
 	if err != nil {
 		http.Error(w, "Failed to retrieve coordinates", http.StatusInternalServerError)
 		return 0, 0, err
@@ -332,7 +293,7 @@ func retrieveWeather(urlAPI string, longitude myFloat, latitude myFloat, w http.
 	}
 
 	//Fetching data from the forecast API
-	err := fetchURLdata(urlAPI+"latitude="+lat+"&longitude="+long+"&hourly=temperature_2m,precipitation&forecast_days=1", w, &myWeather)
+	err := utils.FetchURLdata(urlAPI+"latitude="+lat+"&longitude="+long+"&hourly=temperature_2m,precipitation&forecast_days=1", w, &myWeather)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -363,7 +324,7 @@ func retrieveCurrencyExchangeRates(apiURL, currency string, w http.ResponseWrite
 		Currency map[string]myFloat `json:"rates"`
 	}
 
-	err := fetchURLdata(apiURL+currency, w, &Currencies)
+	err := utils.FetchURLdata(apiURL+currency, w, &Currencies)
 	if err != nil {
 		return nil, err
 	}
@@ -372,14 +333,6 @@ func retrieveCurrencyExchangeRates(apiURL, currency string, w http.ResponseWrite
 	}
 
 	return currencyData, nil
-}
-
-func whatTimeNow() string {
-	currentTime := time.Now()
-	timeLayout := "20060102 15:04" //YYYYMMDD HH:mm
-
-	formattedTime := currentTime.Format(timeLayout)
-	return formattedTime
 }
 
 func floatFormat(number myFloat) (myFloat, error) {

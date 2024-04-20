@@ -86,7 +86,7 @@ func TestFetchURLData(t *testing.T) {
 
 	// Use server.URL as the argument to fetchURLdata
 	var data map[string]string
-	err := fetchURLdata(server.URL, nil, &data)
+	err := utils.FetchURLdata(server.URL, nil, &data)
 	if err != nil {
 		t.Fatal("Expected error, got nil")
 	}
@@ -106,7 +106,7 @@ func TestFetchURLData(t *testing.T) {
 	// Call fetchURLdata with the mock server's URL
 	var data2 interface{}
 	rw := httptest.NewRecorder()
-	err2 := fetchURLdata(server3.URL, rw, &data2)
+	err2 := utils.FetchURLdata(server3.URL, rw, &data2)
 	if err2 == nil {
 		t.Error("expected an error, got nil")
 	}
@@ -118,7 +118,7 @@ func TestFetchURLData(t *testing.T) {
 	defer server2.Close()
 
 	// Call fetchURLdata with the second mock server's URL
-	err3 := fetchURLdata(server2.URL, rw, &data2)
+	err3 := utils.FetchURLdata(server2.URL, rw, &data2)
 	if err3 == nil {
 		t.Error("expected an error, got nil")
 	}
@@ -126,7 +126,7 @@ func TestFetchURLData(t *testing.T) {
 	// Call fetchURLdata with an invalid URL
 	var data3 interface{}
 	rw2 := httptest.NewRecorder()
-	err4 := fetchURLdata("http://invalid url", rw2, &data3)
+	err4 := utils.FetchURLdata("http://invalid url", rw2, &data3)
 	if err4 == nil {
 		t.Error("expected an error, got nil")
 	}
