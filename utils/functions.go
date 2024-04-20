@@ -216,3 +216,13 @@ func FetchURLdata(myData string, w http.ResponseWriter, data interface{}) error 
 	return nil
 
 }
+
+// Function to check if event is valid
+func ValidateEvent(e string) bool {
+	return e == "REGISTER" || e == "INVOKE" || e == "CHANGE" || e == "DELETE"
+}
+
+// Function to check if digit is written in, will be used for checking PORT with localhost url
+func IsDigit(c byte) bool {
+	return c >= '0' && c <= '9'
+}

@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -59,14 +58,6 @@ func deleteWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func ValidateEvent(e string) bool {
-	return e == "REGISTER" || e == "INVOKE" || e == "CHANGE" || e == "DELETE"
-}
-
-func isDigit(c byte) bool {
-	return c >= '0' && c <= '9'
-}
-
 func postWebhook(w http.ResponseWriter, r *http.Request) {
 
 	webCollection := "webhooks"
@@ -81,18 +72,17 @@ func postWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if utils.IsEmptyField(hook.Url) || utils.IsEmptyField(hook.Country) || utils.IsEmptyField(hook.Event) {
-		http.Error(w, "Not all elements are included", http.StatusBadRequest)
+	if utils.IsEmptyField(hook.Url) || utils.IsEmptyField(hook.Event) {
+		http.Error(w, "Url or Event is not included", http.StatusBadRequest)
 		return
 	}
 
-	if !ValidateEvent(hook.Event) {
+	if !utils.ValidateEvent(hook.Event) {
 		http.Error(w, "Event is not added in correctly", http.StatusBadRequest)
 		return
 	}
 
 	if strings.HasPrefix(hook.Url, "http://localhost:") {
-		fmt.Println("This is a test")
 		substring := hook.Url[len("http://localhost:"):]
 		if len(substring) < 5 {
 			http.Error(w, "Localhost url is not valid", http.StatusBadRequest)
@@ -105,8 +95,7 @@ func postWebhook(w http.ResponseWriter, r *http.Request) {
 
 		valid := true
 		for i := 0; i < 4; i++ {
-			fmt.Println(substring[i])
-			if i >= len(substring) || !isDigit(substring[i]) {
+			if i >= len(substring) || !utils.IsDigit(substring[i]) {
 				valid = false
 				break
 			}
@@ -118,22 +107,16 @@ func postWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 
 	} else {
-		fmt.Println("Another test")
 		check, _ := http.Get(hook.Url)
 		if check.StatusCode != http.StatusOK {
 			http.Error(w, "Url provided is not valid", http.StatusBadRequest)
 			return
 		}
 	}
-	a, err := http.Get(structs.COUNTRIES_API_ISOCODE + hook.Country)
-	if err != nil {
-		http.Error(w, "Failed to check for country data", http.StatusBadRequest)
-		return
-	}
+	a, _ := http.Get(structs.COUNTRIES_API_ISOCODE + hook.Country)
 	// Have it so that you can register a webhook with empty country field
-	if a.StatusCode == http.StatusBadRequest && hook.Country != "" {
-		http.Error(w, "isocode: "+hook.Country+" is not valid", http.StatusBadRequest)
-		return
+	if a.StatusCode != http.StatusOK {
+		hook.Country = ""
 	}
 
 	a.Body.Close()
