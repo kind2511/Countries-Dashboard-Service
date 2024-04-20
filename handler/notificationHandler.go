@@ -81,8 +81,7 @@ func postWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//if isEmptyField(hook.Url) || isEmptyField(hook.Country) || isEmptyField(hook.Event) {
-	if isEmptyField(hook.Url) || isEmptyField(hook.Event) {
+	if utils.IsEmptyField(hook.Url) || utils.IsEmptyField(hook.Country) || utils.IsEmptyField(hook.Event) {
 		http.Error(w, "Not all elements are included", http.StatusBadRequest)
 		return
 	}
@@ -220,6 +219,11 @@ func retrieveWebHookData(w http.ResponseWriter, doc *firestore.DocumentSnapshot)
 
 // Gets one webhook based on its Firestore ID. If no ID is provided it gets all webhooks
 func getWebHooks(w http.ResponseWriter, r *http.Request) {
+	if client == nil {
+		http.Error(w, "Error retrieving document", http.StatusInternalServerError)
+		return
+	}
+
 	const webhookCollection = "webhooks"
 	// Extract webhook ID from URL
 	elem := strings.Split(r.URL.Path, "/")
@@ -266,20 +270,6 @@ func getWebHooks(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
-
-/*
-Invokes the web service to trigger event
-*/
-
-// URL to be triggered upon event (the service that should be invoked) <- Where the webhook payload will be sendt
-
-// the country for which the trigger applies (if empty, it applies to any invocation)
-
-// events:
-// REGISTER: webhook is invoked if a new congifuration is registered
-// CHANGE: webhook is invoked if configuration is modified
-// DELETE: webhook is invoked if configuration is deleted
-// INVOKE: webhooks is invoked if dashboard is retrieved (i.e populated with values)
 
 /*
 Handles the invocation of events
@@ -356,7 +346,7 @@ func callUrl(w http.ResponseWriter, hook utils.WebhookInvokeMessage) {
 		country + "' and Event:'" + event + "'.")
 
 	// Set current time
-	timeNow := whatTimeNow2()
+	timeNow := utils.whatTimeNow()
 	hook.Time = timeNow
 
 	// Convert webhook message to JSON bytes
