@@ -32,22 +32,24 @@ const collection = "Dashboard"
 /*
 Handler for all registration-related operations
 */
-func RegistrationHandler(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodPost:
-		postRegistration(w, r)
-	case http.MethodGet:
-		getDashboards(w, r)
-	case http.MethodPut:
-		updateDashboard(w, r, true)
-	case http.MethodPatch:
-		updateDashboard(w, r, false)
-	case http.MethodDelete:
-		deleteDashboard(w, r)
-	default:
-		log.Println("Unsupported request method" + r.Method)
-		http.Error(w, "Unsupported request method"+r.Method, http.StatusMethodNotAllowed)
-		return
+func RegistrationHandler() func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			postRegistration(w, r)
+		case http.MethodGet:
+			getDashboards(w, r)
+		case http.MethodPut:
+			updateDashboard(w, r, true)
+		case http.MethodPatch:
+			updateDashboard(w, r, false)
+		case http.MethodDelete:
+			deleteDashboard(w, r)
+		default:
+			log.Println("Unsupported request method" + r.Method)
+			http.Error(w, "Unsupported request method"+r.Method, http.StatusMethodNotAllowed)
+			return
+		}
 	}
 }
 
