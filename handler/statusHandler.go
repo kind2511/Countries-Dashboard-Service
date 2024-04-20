@@ -40,21 +40,8 @@ func statusGetRequest(w http.ResponseWriter, _ *http.Request) {
 	// Time the server has been running since start
 	upTime := time.Since(startTime).Seconds()
 
-	// Gets status-code for Countries API
-	countriesApiStatusCode, err := http.Get(utils.COUNTRIES_API + "name/Norway")
-	checkHTTPError(err)
-
-	// Gets status-code for Meteo API
-	meteoApiStatusCode, err := http.Get(utils.GEOCODING_API + "Norway&count=1&language=en&format=json")
-	checkHTTPError(err)
-
-	// Gets status-code for Currency API
-	currencyApiStatusCode, err := http.Get(utils.CURRENCY_API + "/nok")
-	checkHTTPError(err)
-
-	// Gets status-code for Notification DB
-	notificationStatus, err := http.Get("https://console.firebase.google.com/project/prog2005-assignment2-ee93a/firestore/databases/-default-/data/~2Fwebhooks")
-	checkHTTPError(err)
+	// Gets status-code for Countries API, Meteo API, Currency API and Notification DB
+	countriesApiStatusCode, meteoApiStatusCode, currencyApiStatusCode, notificationStatus := GetStatusCode()
 
 	// get the number of webhooks in the database
 	// Creates status struct
@@ -73,6 +60,21 @@ func statusGetRequest(w http.ResponseWriter, _ *http.Request) {
 	// Write JSON response to the response body
 	w.Write(statusJSON)
 
+}
+
+func GetStatusCode() (*http.Response, *http.Response, *http.Response, *http.Response) {
+	countriesApiStatusCode, err := http.Get(utils.COUNTRIES_API + "name/Norway")
+	checkHTTPError(err)
+
+	meteoApiStatusCode, err := http.Get(utils.GEOCODING_API + "Norway&count=1&language=en&format=json")
+	checkHTTPError(err)
+
+	currencyApiStatusCode, err := http.Get(utils.CURRENCY_API + "/nok")
+	checkHTTPError(err)
+
+	notificationStatus, err := http.Get("https://console.firebase.google.com/project/prog2005-assignment2-ee93a/firestore/databases/-default-/data/~2Fwebhooks")
+	checkHTTPError(err)
+	return countriesApiStatusCode, meteoApiStatusCode, currencyApiStatusCode, notificationStatus
 }
 
 func createFormat(countriesApiStatusCode *http.Response, meteoApiStatusCode *http.Response, currencyApiStatusCode *http.Response, notificationStatus *http.Response, upTime float64) utils.Status {

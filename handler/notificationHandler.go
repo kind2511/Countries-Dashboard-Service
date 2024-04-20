@@ -5,10 +5,10 @@ import (
 	structs "assignment2/utils"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
-	"fmt"
 
 	"cloud.google.com/go/firestore"
 	"google.golang.org/api/iterator"
@@ -213,6 +213,11 @@ func retrieveWebHookData(w http.ResponseWriter, doc *firestore.DocumentSnapshot)
 
 // Gets one webhook based on its Firestore ID. If no ID is provided it gets all webhooks
 func getWebHooks(w http.ResponseWriter, r *http.Request) {
+	if client == nil {
+		http.Error(w, "Error retrieving document", http.StatusInternalServerError)
+		return
+	}
+
 	const webhookCollection = "webhooks"
 	// Extract webhook ID from URL
 	elem := strings.Split(r.URL.Path, "/")

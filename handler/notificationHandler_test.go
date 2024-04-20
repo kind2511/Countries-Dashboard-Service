@@ -92,6 +92,7 @@ func TestNotificationHandler_POST(t *testing.T) {
 
 }
 
+// Test function for NotificationHandler that is not supported (HEAD)
 func TestNotificationHandler_UnsupportedMethod(t *testing.T) {
 	// Create a mock HTTP request with an unsupported method
 	req, err := http.NewRequest("HEAD", "/notification", nil)
@@ -117,5 +118,167 @@ func TestNotificationHandler_UnsupportedMethod(t *testing.T) {
 		if rr.Body.String() != expected {
 			t.Errorf("handler returned unexpected body: got %v want %v", rr.Body.String(), expected)
 		}
+	}
+}
+
+// Test function for GetWebHooks function
+func TestGetWebHooks(t *testing.T) {
+	// Create a mock http.ResponseWriter
+	w := httptest.NewRecorder()
+
+	// Call getWebHooks with a nil Firestore client
+	client = nil
+	getWebHooks(w, nil)
+
+	// Check the response status code
+	if status := w.Code; status != http.StatusInternalServerError {
+		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusInternalServerError)
+	}
+
+	// Check the response body
+	expected := "Error retrieving document"
+	if strings.TrimSpace(w.Body.String()) != strings.TrimSpace(expected) {
+		t.Errorf("handler returned wrong body: got %v want %v", strings.TrimSpace(w.Body.String()), strings.TrimSpace(expected))
+	}
+}
+
+// Test function for IsDigit function
+func TestIsDigit(t *testing.T) {
+	// Create a test struct with input and expected output
+	tests := []struct {
+		input byte
+		want  bool
+	}{
+		// Test with numbers (valid) and letters (invalid)
+		{'0', true},
+		{'1', true},
+		{'a', false},
+		{'A', false},
+	}
+	// Loop through the test struct and check validity
+	for _, test := range tests {
+		got := isDigit(test.input)
+		if got != test.want {
+			t.Errorf("isDigit(%v) = %v; want %v", test.input, got, test.want)
+		}
+	}
+}
+
+// Test function for PostWebhook function
+func TestPostWebhook(t *testing.T) {
+	// Create a test struct with input and expected output
+	tests := []struct {
+		name       string
+		body       string
+		wantStatus int
+	}{
+		// Fill it with test cases both valid and invalid
+		{
+			name:       "missing url",
+			body:       `{"Country": "Norway", "Event": "Temperature"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "missing country",
+			body:       `{"Url": "http://example.com", "Event": "Temperature"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "missing event",
+			body:       `{"Url": "http://example.com", "Country": "Norway"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "invalid event",
+			body:       `{"Url": "http://example.com", "Country": "Norway", "Event": "Invalid"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "valid localhost url",
+			body:       `{"Url": "http://localhost:8000/", "Country": "Norway", "Event": "INVOKE"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "localhost url too short",
+			body:       `{"Url": "http://localhost:80", "Country": "Norway", "Event": "INVOKE"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "localhost url missing slash",
+			body:       `{"Url": "http://localhost:8000path", "Country": "Norway", "Event": "INVOKE"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+	}
+	// Loop through the test struct and check validity
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			req, err := http.NewRequest("POST", "/webhook", strings.NewReader(test.body))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			rr := httptest.NewRecorder()
+			handler := http.HandlerFunc(postWebhook)
+			handler.ServeHTTP(rr, req)
+
+			if status := rr.Code; status != test.wantStatus {
+				t.Errorf("handler returned wrong status code: got %v want %v", status, test.wantStatus)
+			}
+		})
+	}
+}
+
+// Test function for PostWebhook function nr 2
+func TestPostWebhook2(t *testing.T) {
+	// Create a test struct with input and expected output
+	tests := []struct {
+		name       string
+		body       string
+		wantStatus int
+	}{
+		// Fill it with test cases both valid and invalid
+		{
+			name:       "valid localhost url",
+			body:       `{"Url": "http://localhost:8000/path", "Country": "NO", "Event": "Temperature"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "localhost url too short",
+			body:       `{"Url": "http://localhost:80", "Country": "NO", "Event": "Temperature"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "localhost url missing slash",
+			body:       `{"Url": "http://localhost:8000path", "Country": "NO", "Event": "Temperature"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "localhost url invalid port",
+			body:       `{"Url": "http://localhost:80a0/path", "Country": "NO", "Event": "Temperature"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "invalid country code",
+			body:       `{"Url": "http://example.com", "Country": "INVALID", "Event": "Temperature"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+	}
+
+	// Loop through the test struct and check validity
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			req, err := http.NewRequest("POST", "/webhook", strings.NewReader(test.body))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			rr := httptest.NewRecorder()
+			handler := http.HandlerFunc(postWebhook)
+			handler.ServeHTTP(rr, req)
+
+			if status := rr.Code; status != test.wantStatus {
+				t.Errorf("handler returned wrong status code: got %v want %v", status, test.wantStatus)
+			}
+		})
 	}
 }

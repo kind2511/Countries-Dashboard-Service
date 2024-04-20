@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+// Test function for DashboardHandler function
 func TestDashboardsHandler(t *testing.T) {
 
 	// Initialize handler instance

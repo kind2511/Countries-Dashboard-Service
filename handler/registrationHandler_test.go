@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+// Test function for ISEmptyField function
 func TestIsEmptyField(t *testing.T) {
 	// Test with empty string
 	if !isEmptyField("") {
@@ -94,7 +95,7 @@ func TestCheckValidCurrencies(t *testing.T) {
 	}
 }
 
-// BoolPtr is a helper function for creating a pointer to a bool.
+// Helper function to create a bool pointer
 func BoolPtr(b bool) *bool {
 	return &b
 }
@@ -147,7 +148,7 @@ func TestUpdatedData(t *testing.T) {
 
 	// Call the function
 	updatedObject, missing, missingElements = updatedData(emptyObject, emptyFilledObject, w)
-	// Check that the fields are updated correctly (bools will be false, but not empty)
+	// Check that the fields are updated correctly
 	if !missing || len(missingElements) != 9 {
 		t.Errorf("Did not identify missing objects correctly %v", missingElements)
 	}

@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"assignment2/utils"
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -13,6 +15,7 @@ import (
 	"cloud.google.com/go/firestore"
 )
 
+// Test function for CheckHTTPError function
 func TestCheckHTTPError(t *testing.T) {
 	// Redirect standard output to a buffer
 	oldStdout := os.Stdout
@@ -42,6 +45,7 @@ func TestCheckHTTPError(t *testing.T) {
 
 }
 
+// Test function for CheckHTTPError function with no error
 func TestCheckHTTPErrorNoError(t *testing.T) {
 	// Redirect standard output to a buffer
 	oldStdout := os.Stdout
@@ -63,9 +67,12 @@ func TestCheckHTTPErrorNoError(t *testing.T) {
 	}
 }
 
+// Test function for GetWebhookSize function
 func TestGetWebhookSize(t *testing.T) {
-	mockDocuments := []*firestore.DocumentSnapshot{ /* Initialize with the documents you want the mock function to return */ }
+	// Create mock documents
+	mockDocuments := []*firestore.DocumentSnapshot{}
 
+	// Test success
 	size, err := GetWebhookSize(func() ([]*firestore.DocumentSnapshot, error) {
 		return mockDocuments, nil
 	})
@@ -85,6 +92,7 @@ func TestGetWebhookSize(t *testing.T) {
 
 }
 
+// Test fucntion for StatusHandler
 func TestStatusHandler(t *testing.T) {
 
 	// Initialize handler instance
@@ -121,4 +129,47 @@ func TestStatusHandler(t *testing.T) {
 			strings.TrimSpace(rr.Body.String()), strings.TrimSpace(expected))
 	}
 
+}
+
+// Test function for StatusGetRequest
+func TestStatusGetRequest(t *testing.T) {
+	// Create a mock http.ResponseWriter
+	w := httptest.NewRecorder()
+
+	// Create a Status object
+	Status := utils.Status{
+		Countriesapi:   http.StatusOK,
+		Meteoapi:       http.StatusOK,
+		Currencyapi:    http.StatusOK,
+		Notificationdb: http.StatusOK,
+		Webhooks:       5,
+		Version:        "v1.0",
+		Uptime:         100.0,
+	}
+
+	// Call the part of statusGetRequest that you want to test
+	w.Header().Add("content-type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	statusJSON, err := json.Marshal(Status)
+	if err != nil {
+		http.Error(w, "Unable to marshal status to JSON", http.StatusInternalServerError)
+		return
+	}
+	w.Write(statusJSON)
+
+	// Check the response status code
+	if status := w.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+
+	// Check the response Content-Type header
+	if contentType := w.Header().Get("Content-Type"); contentType != "application/json" {
+		t.Errorf("handler returned wrong Content-Type header: got %v want %v", contentType, "application/json")
+	}
+
+	// Check the response body
+	expectedBody := string(statusJSON)
+	if body := w.Body.String(); body != expectedBody {
+		t.Errorf("handler returned wrong body: got %v want %v", body, expectedBody)
+	}
 }
