@@ -503,17 +503,16 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 				}
 				doc.DataTo(&newObject)
 
-				//Merges the data from firebase with user input (that has been written)
-				final, _, _ := utils.UpdatedData(&newObject, &myObject, w)
-
-				validCountry, validIso, err := utils.CheckCountry(final.Country, final.IsoCode, w)
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return err
+				validCountry, validIso, err := utils.CheckCountry(myObject.Country, myObject.IsoCode, w)
+				//If it turns out that country name or isocode provided in the PATCH request are valid, it will change both variables.
+				//Otherwise, it will not
+				if err == nil {
+					myObject.Country = validCountry
+					myObject.IsoCode = validIso
 				}
 
-				final.Country = validCountry
-				final.IsoCode = validIso
+				//Merges the data from firebase with user input (that has been written)
+				final, _, _ := utils.UpdatedData(&newObject, &myObject, w)
 
 				final.Features.TargetCurrencies = utils.CheckCurrencies(final.Features.TargetCurrencies, w)
 
