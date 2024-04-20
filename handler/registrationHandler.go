@@ -100,6 +100,9 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	dashboard.Country = validCountry
+	dashboard.IsoCode = validIso
+
 	validCurrencies := utils.CheckCurrencies(dashboard.Features.TargetCurrencies, w)
 
 	_, checkIfMissingElements, missingElements := utils.UpdatedData(&dashboard, &dashboard, w)
@@ -136,8 +139,8 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 	_, _, err1 := client.Collection(collection).Add(ctx,
 		map[string]interface{}{
 			"id":      uniqueID,
-			"country": validCountry,
-			"isoCode": validIso,
+			"country": dashboard.Country,
+			"isoCode": dashboard.IsoCode,
 			"features": map[string]interface{}{
 				"temperature":      dashboard.Features.Temperature,
 				"precipitation":    dashboard.Features.Precipitation,
