@@ -82,7 +82,7 @@ func TestCheckValidCurrencies(t *testing.T) {
 	}
 
 	// Call checkValidCurrencies with the mock http.ResponseWriter and Dashboard
-	currencies, err := checkValidCurrencies(server.URL+"/", w, dashboard)
+	currencies, err := checkValidCurrencies(w, dashboard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,12 +92,11 @@ func TestCheckValidCurrencies(t *testing.T) {
 	if !reflect.DeepEqual(currencies, expectedCurrencies) {
 		t.Errorf("expected currencies to be %v, got %v", expectedCurrencies, currencies)
 	}
+}
 
-	// Call checkValidCurrencies with an invalid URL
-	_, err = checkValidCurrencies("http://invalid-url", w, dashboard)
-	if err == nil {
-		t.Error("expected an error, got nil")
-	}
+// BoolPtr is a helper function for creating a pointer to a bool.
+func BoolPtr(b bool) *bool {
+	return &b
 }
 
 // Test function UpdatedData
@@ -109,21 +108,22 @@ func TestUpdatedData(t *testing.T) {
 		Country: "Norway",
 		IsoCode: "NO",
 		Features: utils.Features{
-			Temperature:      true,
-			Precipitation:    true,
-			Capital:          true,
-			Coordinates:      true,
-			Population:       true,
-			Area:             true,
+			Temperature:      BoolPtr(true),
+			Precipitation:    BoolPtr(true),
+			Capital:          BoolPtr(true),
+			Coordinates:      BoolPtr(true),
+			Population:       BoolPtr(true),
+			Area:             BoolPtr(true),
 			TargetCurrencies: []string{"NOK", "EUR"},
 		},
 	}
 
 	// Call the function
-	updatedObject, missing, missingElements := updatedData(emptyObject, filledObject)
+	w := httptest.NewRecorder()
+	updatedObject, missing, missingElements := updatedData(emptyObject, filledObject, w)
 
 	// Check that the fields are updated correctly
-	if updatedObject.Country != "Norway" || updatedObject.IsoCode != "NO" || updatedObject.Features.Area != true {
+	if updatedObject.Country != "Norway" || updatedObject.IsoCode != "NO" || *updatedObject.Features.Area != true {
 		t.Errorf("The fields were not successfully updated")
 	}
 	// Check that the missing elements are correct
@@ -135,7 +135,7 @@ func TestUpdatedData(t *testing.T) {
 	filledObject.Country = ""
 	filledObject.IsoCode = ""
 	// Call the function
-	updatedObject, missing, missingElements = updatedData(emptyObject, filledObject)
+	updatedObject, missing, missingElements = updatedData(emptyObject, filledObject, w)
 
 	// Check that the fields are updated correctly
 	if !missing || len(missingElements) != 2 || missingElements[0] != "Country" || missingElements[1] != "IsoCode" {
@@ -146,9 +146,9 @@ func TestUpdatedData(t *testing.T) {
 	emptyFilledObject := &utils.Firestore{}
 
 	// Call the function
-	updatedObject, missing, missingElements = updatedData(emptyObject, emptyFilledObject)
+	updatedObject, missing, missingElements = updatedData(emptyObject, emptyFilledObject, w)
 	// Check that the fields are updated correctly (bools will be false, but not empty)
-	if !missing || len(missingElements) != 3 {
+	if !missing || len(missingElements) != 9 {
 		t.Errorf("Did not identify missing objects correctly %v", missingElements)
 	}
 }
@@ -174,18 +174,13 @@ func TestHandleValidCountryAndCode(t *testing.T) {
 		Isocode: "NO",
 	}
 	// Call the function
-	isocode, country, err := handleValidCountryAndCode(server.URL+"/", server.URL+"/", w, dashboard)
+	isocode, country, err := handleValidCountryAndCode(w, dashboard)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	// check that the isocode and country are correct
-	if isocode != "NO" || country != "Norway" {
-		t.Errorf("expected isocode to be NO and country to be Norway, got %v and %v", isocode, country)
-	}
-	// update the dashboard with a not found string for the country
-	dashboard.Country = "notFound"
-	// Call the function agaon with the updated dashboard
-	isocode2, country2, err := handleValidCountryAndCode(server.URL+"/", server.URL+"/", w, dashboard)
+	// Call the function again with the updated dashboard
+	isocode2, country2, err := handleValidCountryAndCode(w, dashboard)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

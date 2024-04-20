@@ -249,7 +249,7 @@ func TestRetrieveWeather(t *testing.T) {
 	rw := httptest.NewRecorder()
 
 	// Call retrieveWeather with the mock server's URL
-	avgTemp, avgPrecipitation, err := retrieveWeather(server.URL, 50.1234, 5.1234, rw, nil)
+	avgTemp, avgPrecipitation, err := retrieveWeather(server.URL+"/", 50.1234, 5.1234, rw, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
