@@ -2,6 +2,7 @@ package utils
 
 import "time"
 
+/*
 // Struct for registration
 type Dashboard struct {
 	ID          DashboardResponse `json:"id"`
@@ -25,7 +26,7 @@ type RegFeatures struct {
 type DashboardResponse struct {
 	ID         string `json:"id"`
 	LastChange string `json:"lastChange"`
-}
+}*/
 
 // Struct for country API
 type CountryInfo struct {
@@ -33,6 +34,28 @@ type CountryInfo struct {
 		Common string `json:"common"`
 	} `json:"name"`
 	Isocode string `json:"cca2"`
+}
+
+/*
+The dashboard that is received from dashboards,
+checking if certain data should be implemented and fetched
+*/
+type Dashboard_Get struct {
+	ID         string       `json:"id"`
+	Country    string       `json:"country"`
+	IsoCode    string       `json:"isoCode"`
+	Features   Features_Get `json:"features"`
+	LastChange time.Time    `json:"lastChange"`
+}
+
+type Features_Get struct {
+	Temperature      bool     `json:"temperature,omitempty"`
+	Precipitation    bool     `json:"precipitation,omitempty"`
+	Capital          bool     `json:"capital,omitempty"`
+	Coordinates      bool     `json:"coordinates,omitempty"`
+	Population       bool     `json:"population,omitempty"`
+	Area             bool     `json:"area,omitempty"`
+	TargetCurrencies []string `json:"targetCurrencies,omitempty"`
 }
 
 // Status Struct for status
@@ -81,6 +104,7 @@ type Features struct {
 	TargetCurrencies []string `json:"targetCurrencies"`
 }
 
+/*
 // Desired document structure
 type Registration struct {
 	ID         string   `json:"id"`
@@ -88,7 +112,7 @@ type Registration struct {
 	IsoCode    string   `json:"isoCode"`
 	Features   Features `json:"features"`
 	LastChange string   `json:"lastChange"`
-}
+}*/
 
 // Desired output for default handler
 type DefaultEndpointStruct struct {

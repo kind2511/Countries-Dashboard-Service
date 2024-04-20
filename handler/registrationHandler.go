@@ -5,10 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -26,6 +24,21 @@ var client *firestore.Client
 func SetFirestoreClient(c context.Context, cli *firestore.Client) {
 	ctx = c
 	client = cli
+}
+
+// function to get a document based on its id field
+func GetDocumentByID(ctx context.Context, collection string, dashboardID string) (*firestore.DocumentSnapshot, error) {
+	// Query documents where the 'id' field matches the provided dashboardID
+	query := client.Collection(collection).Where("id", "==", dashboardID).Limit(1)
+	iter := query.Documents(ctx)
+
+	// Retrieve reference to document
+	doc, err := iter.Next()
+	if err != nil {
+		return nil, err
+	}
+
+	return doc, nil
 }
 
 // name of collection used for dashboards
@@ -75,21 +88,21 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if isEmptyField(dashboard.Country) && isEmptyField(dashboard.IsoCode) {
+	if utils.IsEmptyField(dashboard.Country) && utils.IsEmptyField(dashboard.IsoCode) {
 		http.Error(w, "Invalid input: Fields 'Country' and 'Isocode' are empty."+
 			"\n Suggestion: Fill both or one of the fields to register a dashboard", http.StatusBadRequest)
 		return
 	}
 
-	validCountry, validIso, err := checkCountry(dashboard.Country, dashboard.IsoCode, w)
+	validCountry, validIso, err := utils.CheckCountry(dashboard.Country, dashboard.IsoCode, w)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	validCurrencies := checkCurrencies(dashboard.Features.TargetCurrencies, w)
+	validCurrencies := utils.CheckCurrencies(dashboard.Features.TargetCurrencies, w)
 
-	_, checkIfMissingElements, missingElements := updatedData(&dashboard, &dashboard, w)
+	_, checkIfMissingElements, missingElements := utils.UpdatedData(&dashboard, &dashboard, w)
 	if checkIfMissingElements {
 		http.Error(w, "Missing variables: "+strings.Join(missingElements, ", "), http.StatusBadRequest)
 		return
@@ -134,7 +147,7 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 				"area":             dashboard.Features.Area,
 				"targetCurrencies": validCurrencies,
 			},
-			"lastChanged": time.Now(),
+			"lastChange": time.Now(),
 		})
 	if err1 != nil {
 		http.Error(w, "Failed to add document", http.StatusInternalServerError)
@@ -142,10 +155,10 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 	} else {
 		response := struct {
 			ID         string `json:"id"`
-			Lastchange string `json:"lastChanged"`
+			Lastchange string `json:"lastChange"`
 		}{
 			ID:         uniqueID,
-			Lastchange: whatTimeNow(),
+			Lastchange: utils.WhatTimeNow(),
 		}
 		w.Header().Set("Content-type", "application/json")
 		if err := json.NewEncoder(w).Encode(response); err != nil {
@@ -155,42 +168,57 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// function to get a document based on its id field
-func getDocumentByID(ctx context.Context, collection string, dashboardID string) (*firestore.DocumentSnapshot, error) {
-	// Query documents where the 'id' field matches the provided dashboardID
-	query := client.Collection(collection).Where("id", "==", dashboardID).Limit(1)
-	iter := query.Documents(ctx)
-
-	// Retrieve reference to document
-	doc, err := iter.Next()
-	if err != nil {
-		return nil, err
-	}
-
-	return doc, nil
-}
-
 // Function to retrieve document data and write JSON response
 func retrieveDocumentData(w http.ResponseWriter, doc *firestore.DocumentSnapshot) {
+
 	// Map document data to Firestore struct
-	var originalDoc utils.Firestore
+	var originalDoc utils.Dashboard_Get
 	if err := doc.DataTo(&originalDoc); err != nil {
 		log.Println("Error retrieving document data:", err)
 		http.Error(w, "Error retrieving document data", http.StatusInternalServerError)
 		return
 	}
-
 	// Create a Registration struct to create desired structure
-	desiredDoc := utils.Registration{
-		ID:         originalDoc.ID,
-		Country:    originalDoc.Country,
-		IsoCode:    originalDoc.IsoCode,
-		Features:   originalDoc.Features,
-		LastChange: originalDoc.LastChange.Format("20060102 15:04"), // Format timestamp
+	response := struct {
+		ID       string `json:"id"`
+		Country  string `json:"country"`
+		IsoCode  string `json:"isoCode"`
+		Features struct {
+			Temperature      bool     `json:"temperature"`
+			Precipitation    bool     `json:"precipitation"`
+			Capital          bool     `json:"capital"`
+			Coordinates      bool     `json:"coordinates"`
+			Population       bool     `json:"population"`
+			Area             bool     `json:"area"`
+			TargetCurrencies []string `json:"targetCurrencies"`
+		} `json:"features"`
+		LastChange string `json:"lastChange"`
+	}{
+		ID:      originalDoc.ID,
+		Country: originalDoc.Country,
+		IsoCode: originalDoc.IsoCode,
+		Features: struct {
+			Temperature      bool     `json:"temperature"`
+			Precipitation    bool     `json:"precipitation"`
+			Capital          bool     `json:"capital"`
+			Coordinates      bool     `json:"coordinates"`
+			Population       bool     `json:"population"`
+			Area             bool     `json:"area"`
+			TargetCurrencies []string `json:"targetCurrencies"`
+		}{
+			Temperature:      originalDoc.Features.Temperature,
+			Precipitation:    originalDoc.Features.Precipitation,
+			Capital:          originalDoc.Features.Capital,
+			Coordinates:      originalDoc.Features.Coordinates,
+			Population:       originalDoc.Features.Population,
+			Area:             originalDoc.Features.Area,
+			TargetCurrencies: originalDoc.Features.TargetCurrencies,
+		},
+		LastChange: originalDoc.LastChange.Format("20060102 15:04"),
 	}
 
 	// Marshal the desired document to JSON
-	jsonData, err := json.Marshal(desiredDoc)
+	jsonData, err := json.Marshal(response)
 	if err != nil {
 		log.Println("Error marshaling JSON:", err)
 		http.Error(w, "Error marshaling JSON", http.StatusInternalServerError)
@@ -215,7 +243,7 @@ func getDashboards(w http.ResponseWriter, r *http.Request) {
 	dashboardID := elem[4]
 
 	if len(dashboardID) != 0 {
-		doc, err := utils.getDocumentByID(ctx, collection, dashboardID)
+		doc, err := GetDocumentByID(ctx, collection, dashboardID)
 		if err != nil {
 			if err == iterator.Done {
 				// Document not found
@@ -264,7 +292,7 @@ func deleteDashboard(w http.ResponseWriter, r *http.Request) {
 	dashboardID := elem[4]
 
 	if len(dashboardID) != 0 {
-		doc, err := getDocumentByID(ctx, collection, dashboardID)
+		doc, err := GetDocumentByID(ctx, collection, dashboardID)
 		if err != nil {
 			if err == iterator.Done {
 				// Document not found
@@ -295,20 +323,6 @@ func deleteDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Checks if a value is empty, returns true if it is
-func isEmptyField(value interface{}) bool {
-	switch v := value.(type) {
-	case string:
-		return v == ""
-	case *bool:
-		return v == nil
-	case []string:
-		return len(v) == 0
-	default:
-		return false
-	}
-}
-
 // Function that updates a dashboard. Works as both PUT and PATCH, depending on bool given
 func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 
@@ -326,7 +340,7 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 
 	documentExists := true
 
-	doc, err := getDocumentByID(ctx, collection, myId)
+	doc, err := GetDocumentByID(ctx, collection, myId)
 	if err != nil {
 		documentExists = false
 	}
@@ -342,23 +356,22 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 	if isPut {
 		var p utils.Firestore
 		//Checks for missing elements from user input
-		_, checkIfMissingElements, missingElements := updatedData(&p, &myObject, w)
+		_, checkIfMissingElements, missingElements := utils.UpdatedData(&p, &myObject, w)
 		if checkIfMissingElements {
 			http.Error(w, "Missing variables: "+strings.Join(missingElements, ", "), http.StatusBadRequest)
 			return nil
 		}
 
-		var c []utils.CountryInfo
-		err1 := fetchURLdata(utils.COUNTRIES_API_NAME+myObject.Country, w, &c)
-		if err1 != nil {
-			http.Error(w, "Failed to retrieve country: "+myObject.Country, http.StatusBadRequest)
-			return nil
-		}
-		if myObject.IsoCode != c[0].Isocode {
-			myObject.IsoCode = c[0].Isocode
+		validCountry, validIso, err := utils.CheckCountry(myObject.Country, myObject.IsoCode, w)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return err
 		}
 
-		myObject.Features.TargetCurrencies = checkCurrencies(myObject.Features.TargetCurrencies, w)
+		myObject.Country = validCountry
+		myObject.IsoCode = validIso
+
+		myObject.Features.TargetCurrencies = utils.CheckCurrencies(myObject.Features.TargetCurrencies, w)
 
 		//taking the data from the object and applies them to a map
 		data := map[string]interface{}{
@@ -454,17 +467,18 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 				doc.DataTo(&newObject)
 
 				//Merges the data from firebase with user input (that has been written)
-				final, _, _ := updatedData(&newObject, &myObject, w)
+				final, _, _ := utils.UpdatedData(&newObject, &myObject, w)
 
-				var c []utils.CountryInfo
-				err1 := fetchURLdata(utils.COUNTRIES_API_NAME+final.Country, w, &c)
-				if err1 != nil {
-					http.Error(w, "Failed to retrieve country: "+final.Country, http.StatusBadRequest)
-					return nil
+				validCountry, validIso, err := utils.CheckCountry(final.Country, final.IsoCode, w)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return err
 				}
-				if final.IsoCode != c[0].Isocode {
-					final.IsoCode = c[0].Isocode
-				}
+
+				final.Country = validCountry
+				final.IsoCode = validIso
+
+				final.Features.TargetCurrencies = utils.CheckCurrencies(final.Features.TargetCurrencies, w)
 
 				//Updates the document
 				_, err = firestoreDocRef.Set(ctx, map[string]interface{}{
@@ -494,166 +508,4 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 	}
 
 	return nil
-}
-
-// Checks for all the elements in the struct if the input by user includes these values.
-// will then replace with only the written in values, avoids multiple null values if they are not written in
-// returns the object with values, a bool to check if values are missing, and a string array containing all
-// names of the missing elements, to inform the user
-func updatedData(newObject *utils.Firestore, myObject *utils.Firestore, w http.ResponseWriter) (*utils.Firestore, bool, []string) {
-	checkIfMissingElements := false
-	missingElements := make([]string, 0)
-	if !isEmptyField(myObject.Country) {
-		newObject.Country = myObject.Country
-	} else {
-		checkIfMissingElements = true
-		missingElements = append(missingElements, "Country")
-	}
-	if !isEmptyField(myObject.IsoCode) {
-		newObject.IsoCode = myObject.IsoCode
-	} else {
-		checkIfMissingElements = true
-		missingElements = append(missingElements, "IsoCode")
-	}
-	if !isEmptyField(myObject.Features.Area) {
-		newObject.Features.Area = myObject.Features.Area
-	} else {
-		checkIfMissingElements = true
-		missingElements = append(missingElements, "Area")
-	}
-	if !isEmptyField(myObject.Features.Capital) {
-		newObject.Features.Capital = myObject.Features.Capital
-	} else {
-		checkIfMissingElements = true
-		missingElements = append(missingElements, "Capital")
-	}
-	if !isEmptyField(myObject.Features.Coordinates) {
-		newObject.Features.Coordinates = myObject.Features.Coordinates
-	} else {
-		checkIfMissingElements = true
-		missingElements = append(missingElements, "Coordinates")
-	}
-	if !isEmptyField(myObject.Features.Precipitation) {
-		newObject.Features.Precipitation = myObject.Features.Precipitation
-	} else {
-		checkIfMissingElements = true
-		missingElements = append(missingElements, "Precipitation")
-	}
-	if !isEmptyField(myObject.Features.Temperature) {
-		newObject.Features.Temperature = myObject.Features.Temperature
-	} else {
-		checkIfMissingElements = true
-		missingElements = append(missingElements, "Temperature")
-	}
-	if !isEmptyField(myObject.Features.Population) {
-		newObject.Features.Population = myObject.Features.Population
-	} else {
-		checkIfMissingElements = true
-		missingElements = append(missingElements, "Population")
-	}
-	if !isEmptyField(myObject.Features.TargetCurrencies) {
-		newObject.Features.TargetCurrencies = checkCurrencies(myObject.Features.TargetCurrencies, w)
-	} else {
-		checkIfMissingElements = true
-		missingElements = append(missingElements, "Target Currencies")
-	}
-	return newObject, checkIfMissingElements, missingElements
-
-}
-
-// Function to check if currencies are valid. Will make them capitalized, '
-//
-//	and exclude the currencies that do not have a valid value
-func checkCurrencies(arr []string, w http.ResponseWriter) []string {
-
-	//Making a map that contains a bool, if the element has already
-	//been included or not
-	uniqueCurrenciesMap := make(map[string]bool)
-
-	//Making a new array which will contain the valid currencies
-	uniqueCurrenciesArr := make([]string, 0)
-
-	//Going through all currencies in the array
-	for _, currency := range arr {
-		//If the length of the currency is not 3, it is not valid,
-		//and will continue to next element in array
-		if len(currency) != 3 {
-			continue
-		}
-		//Capitalizing the letters in the currency
-		myCurrency := strings.ToUpper(currency)
-
-		//If it hasn't been discovered already
-		if !uniqueCurrenciesMap[myCurrency] {
-			uniqueCurrenciesMap[myCurrency] = true
-
-			//Url for currency api with said currency
-			url := utils.CURRENCY_API + myCurrency
-			type c struct {
-				Result string `json:"result"`
-			}
-			var a c
-
-			//Fetching data from currency api, and putting the data into the struct
-			err := fetchURLdata(url, w, &a)
-			if err != nil {
-				http.Error(w, "Failed to retrieve currency", http.StatusBadRequest)
-				return nil
-			}
-			//If result is not success (such as error), it will print message to user, and continue to next element
-			if a.Result != "success" {
-				log.Println("Currency: " + myCurrency + " is not valid, is being excluded")
-				continue
-			}
-			//Appends currency to the array
-			uniqueCurrenciesArr = append(uniqueCurrenciesArr, myCurrency)
-		}
-	}
-	//Returns array with unique and valid currencies, getting rid of duplicates
-	return uniqueCurrenciesArr
-}
-
-//Function that makes sure both country name and isocode matches
-
-func checkCountry(countryName string, isoCode string, w http.ResponseWriter) (string, string, error) {
-
-	//Creates variables for country name (if country is found), and url with country name for api
-	countryNameFound := true
-	var CountryWithName []utils.CountryInfo
-	countryUrl := url.QueryEscape(countryName)
-	urlName := fmt.Sprintf(utils.COUNTRIES_API_NAME+"%s", countryUrl)
-
-	//Creates variables for iso code (if country exists), and url with iso code for api
-	isoCountryFound := true
-	var CountryWithIso []utils.CountryInfo
-	isoUrl := url.QueryEscape(isoCode)
-	urlIso := fmt.Sprintf(utils.COUNTRIES_API_ISOCODE+"%s", isoUrl)
-
-	//Fetching data from country api and putting it in a struct array
-	err := fetchURLdata(urlName, w, &CountryWithName)
-
-	//If there is no such country, bool is set to false
-	if err != nil {
-		countryNameFound = false
-	}
-
-	//Fetching data from country api and putting it in a struct array
-	err1 := fetchURLdata(urlIso, w, &CountryWithIso)
-
-	//If there is no such country, bool is set to false
-	if err1 != nil {
-		isoCountryFound = false
-	}
-
-	//If countryname is a valid country, returns said data from Api with country name
-	if countryNameFound {
-		return CountryWithName[0].Name.Common, CountryWithName[0].Isocode, nil
-		//If countryname is not valid, but isocode is, it will return data from Api with Iso code
-	} else if !countryNameFound && isoCountryFound {
-		return CountryWithIso[0].Name.Common, CountryWithIso[0].Isocode, nil
-		//Else, it will return blank strings, and an error message
-	} else {
-		return "", "", errors.New("no valid countries")
-	}
-
 }

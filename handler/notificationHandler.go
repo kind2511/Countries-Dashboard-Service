@@ -5,10 +5,10 @@ import (
 	structs "assignment2/utils"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
-	"fmt"
 
 	"cloud.google.com/go/firestore"
 	"google.golang.org/api/iterator"
@@ -78,7 +78,7 @@ func postWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if isEmptyField(hook.Url) || isEmptyField(hook.Country) || isEmptyField(hook.Event) {
+	if utils.IsEmptyField(hook.Url) || utils.IsEmptyField(hook.Country) || utils.IsEmptyField(hook.Event) {
 		http.Error(w, "Not all elements are included", http.StatusBadRequest)
 		return
 	}
