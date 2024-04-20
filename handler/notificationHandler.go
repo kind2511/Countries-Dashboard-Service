@@ -58,13 +58,16 @@ func deleteWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// POST requests being handled with this function
 func postWebhook(w http.ResponseWriter, r *http.Request) {
 
+	//Collection in firestore
 	webCollection := "webhooks"
 	decoder := json.NewDecoder(r.Body)
 
 	decoder.DisallowUnknownFields()
 
+	//Creating a struct variable, and assigning values to this struct with data provided by user
 	var hook utils.WebhookRegistration
 	err := decoder.Decode(&hook)
 	if err != nil {
@@ -72,28 +75,41 @@ func postWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//If url or event is empty, error is returned
 	if utils.IsEmptyField(hook.Url) || utils.IsEmptyField(hook.Event) {
 		http.Error(w, "Url or Event is not included", http.StatusBadRequest)
 		return
 	}
 
+	//if event is not REGISTER, CHANGE, INVOKE or DELETE, returns error
 	if !utils.ValidateEvent(hook.Event) {
 		http.Error(w, "Event is not added in correctly", http.StatusBadRequest)
 		return
 	}
 
+	/*
+		Here is where it checks the url.
+		Checks for either localhost urls or regular urls
+		For localhost urls, it checks if it contains the string http://localhost:XXXX/
+		at the start, where XXXX needs to be digits, and not other characters
+	*/
 	if strings.HasPrefix(hook.Url, "http://localhost:") {
+		//Checks if the substring contains at least 5 characters
 		substring := hook.Url[len("http://localhost:"):]
 		if len(substring) < 5 {
 			http.Error(w, "Localhost url is not valid", http.StatusBadRequest)
 			return
 
+			//If the fifth character in the substring is not '/', it returns error
 		} else if substring[4] != '/' {
 			http.Error(w, "Localhost url is not valid", http.StatusBadRequest)
 			return
 		}
 
+		//Bool to see if url is valid
 		valid := true
+		//Runs through the four characters, to see if the port contains only digits
+		//Returns false if 1 of them does not contain a digit
 		for i := 0; i < 4; i++ {
 			if i >= len(substring) || !utils.IsDigit(substring[i]) {
 				valid = false
@@ -101,11 +117,14 @@ func postWebhook(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		//If not valid
 		if !valid {
 			http.Error(w, "Localhost url is not valid", http.StatusBadRequest)
 			return
 		}
 
+		//If it is a regular url, it does a get request,
+		//and if it returns status code other than 200, error is returned
 	} else {
 		check, _ := http.Get(hook.Url)
 		if check.StatusCode != http.StatusOK {
@@ -113,8 +132,9 @@ func postWebhook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	//Checks if country is valid
 	a, _ := http.Get(structs.COUNTRIES_API_ISOCODE + hook.Country)
-	// Have it so that you can register a webhook with empty country field
+	// If country is not valid, country is set to blank (works also if country is not written in)
 	if a.StatusCode != http.StatusOK {
 		hook.Country = ""
 	}
