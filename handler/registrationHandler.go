@@ -107,13 +107,6 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 
 	validCurrencies := utils.CheckCurrencies(dashboard.Features.TargetCurrencies, w)
 
-	// Trigger event if registered configuration has a registered webhook to invoke
-	if !checkWebhook(dashboard.IsoCode) {
-		log.Println("No event triggered...")
-	} else {
-		invocationHandler(w, "REGISTER", dashboard.IsoCode)
-	}
-
 	_, checkIfMissingElements, missingElements := utils.UpdatedData(&dashboard, &dashboard, w)
 	if checkIfMissingElements {
 		http.Error(w, "Missing variables: "+strings.Join(missingElements, ", "), http.StatusBadRequest)
@@ -176,6 +169,13 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			http.Error(w, "failed to encode result", http.StatusInternalServerError)
 			return
+		}
+
+		// Trigger event if registered configuration has a registered webhook to invoke
+		if !checkWebhook(dashboard.IsoCode) {
+			log.Println("No REGISTER event triggered...")
+		} else {
+			invocationHandler(w, "REGISTER", dashboard.IsoCode)
 		}
 	}
 }
@@ -338,7 +338,7 @@ func deleteDashboard(w http.ResponseWriter, r *http.Request) {
 
 		// Trigger event if deleted configuration has a registered webhook to invoke
 		if !checkWebhook(isocode) {
-			log.Println("No event triggered...")
+			log.Println("No DELETE event triggered...")
 		} else {
 			invocationHandler(w, "DELETE", isocode)
 		}
@@ -377,6 +377,12 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 	if documentExists {
 		//Reference to the document with specified id (will be changed later)
 		docRef = client.Collection(collection).Doc(doc.Ref.ID)
+	}
+
+	// Retrieve current isocode value from the document for webhook event
+	isocode, ok := doc.Data()["isoCode"].(string)
+	if !ok {
+		log.Println("Error accessing isocode field")
 	}
 
 	//If the user puts in PUT request
@@ -473,10 +479,10 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 		}
 
 		// Trigger event if registered configuration has a registered webhook to invoke
-		if !checkWebhook(myObject.IsoCode) {
-			log.Println("No event triggered...")
+		if !checkWebhook(isocode) {
+			log.Println("No CHANGE event triggered...")
 		} else {
-			invocationHandler(w, "CHANGE", myObject.IsoCode)
+			invocationHandler(w, "CHANGE", isocode)
 		}
 
 		//If user put in a PATCH request
@@ -531,17 +537,17 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 					http.Error(w, "Failed to patch", http.StatusInternalServerError)
 					return err
 				}
-
-				// Trigger event if registered configuration has a registered webhook to invoke
-				if !checkWebhook(final.IsoCode) {
-					log.Println("No event triggered...")
-				} else {
-					invocationHandler(w, "CHANGE", final.IsoCode)
-				}
 			}
 		} else {
 			http.Error(w, "Document does not exist", http.StatusBadRequest)
 			return nil
+		}
+
+		// Trigger event if registered configuration has a registered webhook to invoke
+		if !checkWebhook(isocode) {
+			log.Println("No CHANGE event triggered...")
+		} else {
+			invocationHandler(w, "CHANGE", isocode)
 		}
 
 	}

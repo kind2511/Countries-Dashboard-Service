@@ -291,16 +291,39 @@ func invocationHandler(w http.ResponseWriter, event string, country string) {
 
 	default:
 		http.Error(w, "No webhook invocation", http.StatusNotFound)
-
 	}
 }
 
 /*
-Handles the event triggers
+Checks if the event meets the conditions to trigger
+*/
+func checkWebhook(isocode string) bool {
+
+	webhookCollection := "webhooks"
+
+	query := client.Collection(webhookCollection).Where("country", "in", []string{isocode, ""})
+	iter := query.Documents(ctx)
+
+	// Retrieve reference to document
+	_, err := iter.Next()
+	if err != nil {
+		if err == iterator.Done {
+			// Document not found
+			return false
+		}
+		// If trouble retrieving document
+		log.Println("Error retrieving document:", err)
+		return false
+	} else {
+		// iterate through webhooks and trigger based on country and event conditions
+		return true
+	}
+}
+
+/*
+Handle the triggered event
 */
 func triggerEvent(w http.ResponseWriter, event string, country string) {
-
-	log.Println(event + " event triggered...")
 
 	webhookCollection := "webhooks"
 
@@ -320,6 +343,8 @@ func triggerEvent(w http.ResponseWriter, event string, country string) {
 			http.Error(w, "Error iterating over webhook documents ", http.StatusInternalServerError)
 
 		}
+
+		log.Println(event + " event triggered...")
 
 		//  Message body when invoking url
 		var hook utils.WebhookInvokeMessage
@@ -346,7 +371,7 @@ func callUrl(w http.ResponseWriter, hook utils.WebhookInvokeMessage) {
 		country + "' and Event:'" + event + "'.")
 
 	// Set current time
-	timeNow := utils.whatTimeNow()
+	timeNow := utils.WhatTimeNow()
 	hook.Time = timeNow
 
 	// Convert webhook message to JSON bytes
@@ -385,33 +410,4 @@ func callUrl(w http.ResponseWriter, hook utils.WebhookInvokeMessage) {
 
 	log.Println("Webhook " + url + " invoked. Received status code " +
 		strconv.Itoa(res.StatusCode) + " and body: " + string(response))
-}
-
-/*
-Checks if a event has been triggered by the handlers
-*/
-func checkWebhook(isocode string) bool {
-	log.Println(isocode)
-
-	country := isocode
-
-	webhookCollection := "webhooks"
-
-	query := client.Collection(webhookCollection).Where("country", "in", []string{country, ""})
-	iter := query.Documents(ctx)
-
-	// Retrieve reference to document
-	_, err := iter.Next()
-	if err != nil {
-		if err == iterator.Done {
-			// Document not found
-			return false
-		}
-		// If trouble retrieving document
-		log.Println("Error retrieving document:", err)
-		return false
-	} else {
-		// iterate through webhooks and trigger based on country and event conditions
-		return true
-	}
 }
