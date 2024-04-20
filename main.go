@@ -23,7 +23,7 @@ func main() {
 	ctx = context.Background()
 
 	// Loads credential file from firebase
-	sa := option.WithCredentialsFile("prog2005-assignment2-Pham.json")
+	sa := option.WithCredentialsFile("prog2005-assignment2-ee93a-firebase-adminsdk-9o3qm-43d9d2d766.json")
 	app, err := firebase.NewApp(ctx, nil, sa)
 	if err != nil {
 		log.Println(err)
