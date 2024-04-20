@@ -357,14 +357,6 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 
 	//If the user puts in PUT request
 	if isPut {
-		var p utils.Firestore
-		//Checks for missing elements from user input
-		_, checkIfMissingElements, missingElements := utils.UpdatedData(&p, &myObject, w)
-		if checkIfMissingElements {
-			http.Error(w, "Missing variables: "+strings.Join(missingElements, ", "), http.StatusBadRequest)
-			return nil
-		}
-
 		validCountry, validIso, err := utils.CheckCountry(myObject.Country, myObject.IsoCode, w)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -373,6 +365,13 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 
 		myObject.Country = validCountry
 		myObject.IsoCode = validIso
+		var p utils.Firestore
+		//Checks for missing elements from user input
+		_, checkIfMissingElements, missingElements := utils.UpdatedData(&p, &myObject, w)
+		if checkIfMissingElements {
+			http.Error(w, "Missing variables: "+strings.Join(missingElements, ", "), http.StatusBadRequest)
+			return nil
+		}
 
 		myObject.Features.TargetCurrencies = utils.CheckCurrencies(myObject.Features.TargetCurrencies, w)
 
@@ -417,8 +416,6 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 				}
 			}
 		} else {
-			http.Error(w, "This is a test", http.StatusInternalServerError)
-
 			var uniqueID string
 
 			for {
