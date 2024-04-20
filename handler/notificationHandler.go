@@ -81,8 +81,8 @@ func postWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if utils.IsEmptyField(hook.Url) || utils.IsEmptyField(hook.Country) || utils.IsEmptyField(hook.Event) {
-		http.Error(w, "Not all elements are included", http.StatusBadRequest)
+	if utils.IsEmptyField(hook.Url) || utils.IsEmptyField(hook.Event) {
+		http.Error(w, "Not all needed elements are included", http.StatusBadRequest)
 		return
 	}
 
@@ -367,8 +367,16 @@ func callUrl(w http.ResponseWriter, hook utils.WebhookInvokeMessage) {
 	event := hook.Event
 	country := hook.Country
 
-	log.Println("Attempting invocation of URL " + url + " with content Country:'" +
+	log.Println("Attempting invocation of URL " + url + " of content Country:'" +
 		country + "' and Event:'" + event + "'.")
+
+	// Check if URL service is OK
+	ok, err := http.Head(url)
+	if err != nil {
+		if ok.StatusCode != http.StatusOK {
+			log.Println("Invalid URL")
+		}
+	}
 
 	// Set current time
 	timeNow := utils.WhatTimeNow()
@@ -382,7 +390,7 @@ func callUrl(w http.ResponseWriter, hook utils.WebhookInvokeMessage) {
 		return
 	}
 
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(payload))
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload))
 	if err != nil {
 		log.Println("Error creating HTTP request: ", err)
 		http.Error(w, "Error creating HTTP request", http.StatusInternalServerError)

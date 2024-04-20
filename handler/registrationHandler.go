@@ -319,7 +319,7 @@ func deleteDashboard(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Retrieve isocode value from the document for webhook event
+		// Retrieve isocode value from the document for webhook possible event
 		isocode, ok := doc.Data()["isoCode"].(string)
 		if !ok {
 			log.Println("Error accessing isocode field")
@@ -478,7 +478,7 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 
 		}
 
-		// Trigger event if registered configuration has a registered webhook to invoke
+		// Trigger event if changed configuration has a registered webhook to invoke
 		if !checkWebhook(isocode) {
 			log.Println("No CHANGE event triggered...")
 		} else {
@@ -543,7 +543,7 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 			return nil
 		}
 
-		// Trigger event if registered configuration has a registered webhook to invoke
+		// Trigger event if changed configuration has a registered webhook to invoke
 		if !checkWebhook(isocode) {
 			log.Println("No CHANGE event triggered...")
 		} else {
