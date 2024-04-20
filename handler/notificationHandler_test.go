@@ -195,6 +195,11 @@ func TestPostWebhook(t *testing.T) {
 		},
 		{
 			name:       "valid localhost url",
+			body:       `{"Url": "http://localhost:8a00/", "Country": "Norway", "Event": "INVOKE"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "valid localhost url",
 			body:       `{"Url": "http://localhost:8000/", "Country": "Norway", "Event": "INVOKE"}`,
 			wantStatus: http.StatusBadRequest,
 		},
@@ -206,6 +211,11 @@ func TestPostWebhook(t *testing.T) {
 		{
 			name:       "localhost url missing slash",
 			body:       `{"Url": "http://localhost:8000path", "Country": "Norway", "Event": "INVOKE"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "country with space",
+			body:       `{"Url": "http://localhost:1234/path", "Country": "No rway ", "Event": "Temperature"}`,
 			wantStatus: http.StatusBadRequest,
 		},
 	}
@@ -226,6 +236,14 @@ func TestPostWebhook(t *testing.T) {
 			}
 		})
 	}
+
+	// Check that the generated ID is of the correct length
+	uniqueID := utils.GenerateUID(5)
+
+	if len(uniqueID) != 5 {
+		t.Errorf("Expected length to be 5, got %v", len(uniqueID))
+	}
+
 }
 
 // Test function for PostWebhook function nr 2
@@ -260,6 +278,11 @@ func TestPostWebhook2(t *testing.T) {
 		{
 			name:       "invalid country code",
 			body:       `{"Url": "http://example.com", "Country": "INVALID", "Event": "Temperature"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "localhost url invalid port",
+			body:       `{"Url": "http://localhost:80a0/path", "Country": "NO", "Event": "Temperature"}`,
 			wantStatus: http.StatusBadRequest,
 		},
 	}
