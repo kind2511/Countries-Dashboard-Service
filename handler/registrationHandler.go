@@ -472,9 +472,12 @@ func deleteDashboard(w http.ResponseWriter, r *http.Request) {
 	dashboardID := elem[4]
 
 	if len(dashboardID) != 0 {
+
 		doc, err := getDocumentByID(ctx, collection, dashboardID)
+
 		if err != nil {
-			if err == iterator.Done {
+			//if err == iterator.Done {
+			if status.Code(err) == codes.NotFound {
 				// Document not found
 				errorMessage := "Document with ID " + dashboardID + " not found"
 				http.Error(w, errorMessage, http.StatusNotFound)
@@ -484,6 +487,12 @@ func deleteDashboard(w http.ResponseWriter, r *http.Request) {
 			log.Println("Error retrieving document:", err)
 			http.Error(w, "Error retrieving document", http.StatusInternalServerError)
 			return
+		}
+
+		// Retrieve isocode value from the document for webhook event
+		isocode, ok := doc.Data()["isoCode"].(string)
+		if !ok {
+			log.Println("Error accessing isocode field")
 		}
 
 		// Delete the document
@@ -496,6 +505,13 @@ func deleteDashboard(w http.ResponseWriter, r *http.Request) {
 
 		// Return success message
 		w.WriteHeader(http.StatusNoContent)
+
+		// Trigger event if deleted configuration has a registered webhook to invoke
+		if !checkWebhook(isocode) {
+			log.Println("No event triggered...")
+		} else {
+			invocationHandler(w, "DELETE", isocode)
+		}
 
 	} else {
 		// If Dashboard ID is not provided
@@ -702,18 +718,19 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 					http.Error(w, "Failed to patch", http.StatusInternalServerError)
 					return err
 				}
+
+				// Trigger event if registered configuration has a registered webhook to invoke
+				if !checkWebhook(final.IsoCode) {
+					log.Println("No event triggered...")
+				} else {
+					invocationHandler(w, "CHANGE", final.IsoCode)
+				}
 			}
 		} else {
 			http.Error(w, "Document does not exist", http.StatusBadRequest)
 			return nil
 		}
 
-		// Trigger event if registered configuration has a registered webhook to invoke
-		if !checkWebhook(final.IsoCode) {
-			log.Println("No event triggered...")
-		} else {
-			invocationHandler(w, "CHANGE", final.IsoCode)
-		}
 	}
 
 	return nil

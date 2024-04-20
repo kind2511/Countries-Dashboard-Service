@@ -199,6 +199,13 @@ func DashboardFunc(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 
+		// Trigger event if registered configuration has a registered webhook to invoke
+		if !checkWebhook(Result.IsoCode) {
+			log.Println("No event triggered...")
+		} else {
+			invocationHandler(w, "INVOKE", Result.IsoCode)
+		}
+
 	}
 
 	return nil
