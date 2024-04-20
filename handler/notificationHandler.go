@@ -141,6 +141,7 @@ func postWebhook(w http.ResponseWriter, r *http.Request) {
 
 	a.Body.Close()
 
+	//Unique id for webhook
 	var uniqueID string
 
 	for {
@@ -165,8 +166,10 @@ func postWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	//Capitalizes isocode
 	isocode := strings.ToUpper(hook.Country)
 
+	//Adds document to webhook collection in firestore with data
 	_, _, err1 := client.Collection(webCollection).Add(ctx,
 		map[string]interface{}{
 			"id":      uniqueID,
@@ -177,6 +180,7 @@ func postWebhook(w http.ResponseWriter, r *http.Request) {
 	if err1 != nil {
 		return
 	} else {
+		//Response to user with id that is given to webhook
 		response := struct {
 			ID string `json:"id"`
 		}{
