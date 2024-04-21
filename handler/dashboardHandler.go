@@ -180,12 +180,9 @@ func DashboardFunc(w http.ResponseWriter, r *http.Request) error {
 		}
 
 		// Trigger event if registered configuration has a webhook to invoke
-		if !checkWebhook(Result.IsoCode) {
-			log.Println("No event triggered...")
-		} else {
-			invocationHandler(w, "INVOKE", Result.IsoCode)
+		if !invocationHandler(w, "INVOKE", Result.IsoCode) {
+			return err
 		}
-
 	} else {
 
 		http.Error(w, "Needs an Id after endpoint to be used", http.StatusBadRequest)

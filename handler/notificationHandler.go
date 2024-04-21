@@ -288,13 +288,17 @@ func getWebHooks(w http.ResponseWriter, r *http.Request) {
 /*
 Handles the invocation of events
 */
-func invocationHandler(w http.ResponseWriter, event string, country string) {
+func invocationHandler(w http.ResponseWriter, event string, isocode string) bool {
+	if !checkWebhook(isocode) {
+		return false
+	}
+
 	if event == "REGISTER" || event == "CHANGE" || event == "DELETE" || event == "INVOKE" {
 
 		// retrieve the webhooks which will be triggered by the conditions
 		query := client.Collection(webhookCollection).
 			Where("event", "==", event).
-			Where("country", "in", []string{country, ""})
+			Where("country", "in", []string{isocode, ""})
 
 		iter := query.Documents(ctx)
 		for {
@@ -305,7 +309,7 @@ func invocationHandler(w http.ResponseWriter, event string, country string) {
 			if err != nil {
 				log.Println("Error iterating over webhook documents: ", err)
 				http.Error(w, "Error iterating over webhook documents ", http.StatusInternalServerError)
-				return
+				return false
 			}
 
 			log.Println(event + " event triggered...")
@@ -315,13 +319,14 @@ func invocationHandler(w http.ResponseWriter, event string, country string) {
 			if err := doc.DataTo(&hook); err != nil {
 				log.Println("Error retrieving document data: ", err)
 				http.Error(w, "Error retrieving document data ", http.StatusInternalServerError)
-				return
+				return false
 			}
 
 			// Call the url
 			go callUrl(w, hook)
 		}
 	}
+	return false
 }
 
 /*
