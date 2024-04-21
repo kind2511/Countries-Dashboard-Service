@@ -164,90 +164,8 @@ func TestIsDigit(t *testing.T) {
 	}
 }
 
-// Test function for PostWebhook function
-func TestPostWebhook(t *testing.T) {
-	// Create a test struct with input and expected output
-	tests := []struct {
-		name       string
-		body       string
-		wantStatus int
-	}{
-		// Fill it with test cases both valid and invalid
-		{
-			name:       "missing url",
-			body:       `{"Country": "Norway", "Event": "Temperature"}`,
-			wantStatus: http.StatusBadRequest,
-		},
-		{
-			name:       "missing country",
-			body:       `{"Url": "http://example.com", "Event": "Temperature"}`,
-			wantStatus: http.StatusBadRequest,
-		},
-		{
-			name:       "missing event",
-			body:       `{"Url": "http://example.com", "Country": "Norway"}`,
-			wantStatus: http.StatusBadRequest,
-		},
-		{
-			name:       "invalid event",
-			body:       `{"Url": "http://example.com", "Country": "Norway", "Event": "Invalid"}`,
-			wantStatus: http.StatusBadRequest,
-		},
-		{
-			name:       "valid localhost url",
-			body:       `{"Url": "http://localhost:8a00/", "Country": "Norway", "Event": "INVOKE"}`,
-			wantStatus: http.StatusBadRequest,
-		},
-		{
-			name:       "valid localhost url",
-			body:       `{"Url": "http://localhost:8000/", "Country": "Norway", "Event": "INVOKE"}`,
-			wantStatus: http.StatusBadRequest,
-		},
-		{
-			name:       "localhost url too short",
-			body:       `{"Url": "http://localhost:80", "Country": "Norway", "Event": "INVOKE"}`,
-			wantStatus: http.StatusBadRequest,
-		},
-		{
-			name:       "localhost url missing slash",
-			body:       `{"Url": "http://localhost:8000path", "Country": "Norway", "Event": "INVOKE"}`,
-			wantStatus: http.StatusBadRequest,
-		},
-		{
-			name:       "country with space",
-			body:       `{"Url": "http://localhost:1234/path", "Country": "No rway ", "Event": "Temperature"}`,
-			wantStatus: http.StatusBadRequest,
-		},
-	}
-	// Loop through the test struct and check validity
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			req, err := http.NewRequest("POST", "/webhook", strings.NewReader(test.body))
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			rr := httptest.NewRecorder()
-			handler := http.HandlerFunc(postWebhook)
-			handler.ServeHTTP(rr, req)
-
-			if status := rr.Code; status != test.wantStatus {
-				t.Errorf("handler returned wrong status code: got %v want %v", status, test.wantStatus)
-			}
-		})
-	}
-
-	// Check that the generated ID is of the correct length
-	uniqueID := utils.GenerateUID(5)
-
-	if len(uniqueID) != 5 {
-		t.Errorf("Expected length to be 5, got %v", len(uniqueID))
-	}
-
-}
-
 // Test function for PostWebhook function nr 2
-func TestPostWebhook2(t *testing.T) {
+func TestPostWebhook(t *testing.T) {
 	// Create a test struct with input and expected output
 	tests := []struct {
 		name       string
@@ -285,6 +203,41 @@ func TestPostWebhook2(t *testing.T) {
 			body:       `{"Url": "http://localhost:80a0/path", "Country": "NO", "Event": "Temperature"}`,
 			wantStatus: http.StatusBadRequest,
 		},
+		{
+			name:       "missing url",
+			body:       `{"Country": "Norway", "Event": "Temperature"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "missing country",
+			body:       `{"Url": "http://example.com", "Event": "Temperature"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "missing event",
+			body:       `{"Url": "http://example.com", "Country": "Norway"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "invalid event",
+			body:       `{"Url": "http://example.com", "Country": "Norway", "Event": "Invalid"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "localhost url too short",
+			body:       `{"Url": "http://localhost:80", "Country": "Norway", "Event": "INVOKE"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "localhost url missing slash",
+			body:       `{"Url": "http://localhost:8000path", "Country": "Norway", "Event": "INVOKE"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "country with space",
+			body:       `{"Url": "http://localhost:1234/path", "Country": "No rway ", "Event": "Temperature"}`,
+			wantStatus: http.StatusBadRequest,
+		},
 	}
 
 	// Loop through the test struct and check validity
@@ -303,5 +256,12 @@ func TestPostWebhook2(t *testing.T) {
 				t.Errorf("handler returned wrong status code: got %v want %v", status, test.wantStatus)
 			}
 		})
+	}
+
+	// Check that the generated ID is of the correct length
+	uniqueID := utils.GenerateUID(5)
+
+	if len(uniqueID) != 5 {
+		t.Errorf("Expected length to be 5, got %v", len(uniqueID))
 	}
 }

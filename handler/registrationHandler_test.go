@@ -1,12 +1,16 @@
 package handler
 
 import (
+	"assignment2/utils"
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/firestore"
 )
@@ -63,5 +67,73 @@ func TestSetFirestoreClient(t *testing.T) {
 	}
 	if ctx == nil {
 		t.Errorf("SetFirestoreClient() did not correctly set the context")
+	}
+}
+
+// Test for postRegistration function
+func TestPostRegistration(t *testing.T) {
+	// Create a Firestore object
+	dashboard := utils.Firestore{
+		ID:      "testID",
+		Country: "testCountry",
+		Features: utils.Features{
+			Temperature:      new(bool),
+			Precipitation:    new(bool),
+			Capital:          new(bool),
+			Coordinates:      new(bool),
+			Population:       new(bool),
+			Area:             new(bool),
+			TargetCurrencies: []string{"USD", "EUR"},
+		},
+		IsoCode:    "testIsoCode",
+		LastChange: time.Now(),
+	}
+
+	// Convert the Firestore object to JSON
+	dashboardJSON, err := json.Marshal(dashboard)
+	if err != nil {
+		t.Fatalf("json.Marshal() returned error: %v", err)
+	}
+
+	// Create a new request with the JSON body
+	req, err := http.NewRequest("POST", "/register", bytes.NewBuffer(dashboardJSON))
+	if err != nil {
+		t.Fatalf("http.NewRequest() returned error: %v", err)
+	}
+
+	// Create a ResponseRecorder to record the response
+	rr := httptest.NewRecorder()
+
+	// Call postRegistration with the request and the ResponseRecorder
+	postRegistration(rr, req)
+
+	// Check the result
+	if rr.Code != http.StatusInternalServerError {
+		t.Errorf("postRegistration() returned status code %v; want %v", rr.Code, http.StatusInternalServerError)
+	}
+
+	// Test with empty Country and IsoCode fields
+	dashboard2 := utils.Firestore{
+		ID:         "testID",
+		Features:   utils.Features{},
+		LastChange: time.Now(),
+	}
+
+	// Convert the Firestore object to JSON
+	dashboardJSON, err2 := json.Marshal(dashboard2)
+	if err2 != nil {
+		t.Fatalf("json.Marshal() returned error: %v", err)
+	}
+	// Create a new request with the JSON body
+	req, err = http.NewRequest("POST", "/register", bytes.NewBuffer(dashboardJSON))
+	if err != nil {
+		t.Fatalf("http.NewRequest() returned error: %v", err)
+	}
+	// Create a ResponseRecorder to record the response
+	rr = httptest.NewRecorder()
+	postRegistration(rr, req)
+	// Check the result
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("postRegistration() returned status code %v; want %v", rr.Code, http.StatusBadRequest)
 	}
 }
