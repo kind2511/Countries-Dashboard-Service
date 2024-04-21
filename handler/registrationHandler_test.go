@@ -137,3 +137,19 @@ func TestPostRegistration(t *testing.T) {
 		t.Errorf("postRegistration() returned status code %v; want %v", rr.Code, http.StatusBadRequest)
 	}
 }
+
+// Test for DeleteDashboard function
+func TestDeleteDashboard(t *testing.T) {
+	// Test without dashboard ID
+	req, err := http.NewRequest("DELETE", "/dashboard/", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest() returned error: %v", err)
+	}
+	// Create a ResponseRecorder to record the response
+	rr := httptest.NewRecorder()
+	deleteDashboard(rr, req)
+	// Check the result is as expected
+	if status := rr.Code; status != http.StatusBadRequest {
+		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusBadRequest)
+	}
+}
