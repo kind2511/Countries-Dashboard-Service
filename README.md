@@ -452,8 +452,10 @@ Body:
 * Used Firebase to minimize invocation on third-party libraries. 
 
 
-## Test 
-To run the tests run command in root folder:  go test -v ./.... Here you will see what tests are run, and if they pass or fail. 
+## Tests 
+To run the tests, run this command in your root folder:  go test -v ./.... 
+
+Here you will see what tests are run, and if they pass or fail. 
 
 There are test for functions that do not directly access firestore, or parts of functions that do not access firestore. With mocking of firestore, it is possible to make the % of tests much higher, but due to time and problems mocking firestore (and to our understanding, it is not in our curriculum to be able to mock firestore) these are not tested. 
 
@@ -464,4 +466,4 @@ The service is to be deployed on an IaaS solution OpenStack using Docker.
 
 URL to deployed service on SkyHigh: http://10.212.169.134:8080/ (requires VPN)
 
-To run this code yourself, you need to connect it to your own firestore, by making databases there (named Dashboard and webhooks), and put your firestore key in the same folder as main.go
+To run this code yourself, you need to connect it to your own firestore, by making databases there (named Dashboard and webhooks), and put your firestore key in the same folder as main.go (and change code accordingly to use your own firestore collections)
