@@ -86,7 +86,7 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 	err := decoder.Decode(&dashboard)
 	if err != nil {
 		log.Println("Error: decoding JSON into Dashboard struct due to ", err)
-		http.Error(w, "Error: decoding JSON, Invalid inputs "+err.Error(), http.StatusBadRequest)
+		http.Error(w, "Error: decoding JSON, Invalid input \n"+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -172,10 +172,9 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Trigger event if registered configuration has a registered webhook to invoke
-		if !checkWebhook(dashboard.IsoCode) {
-			log.Println("No REGISTER event triggered...")
-		} else {
-			invocationHandler(w, "REGISTER", dashboard.IsoCode)
+		// Trigger event if changed configuration has a registered webhook to invoke
+		if !invocationHandler(w, "REGISTER", dashboard.IsoCode) {
+			return
 		}
 	}
 }
@@ -329,11 +328,9 @@ func deleteDashboard(w http.ResponseWriter, r *http.Request) {
 		// Return success message
 		w.WriteHeader(http.StatusNoContent)
 
-		// Trigger event if deleted configuration has a registered webhook to invoke
-		if !checkWebhook(isocode) {
-			log.Println("No DELETE event triggered...")
-		} else {
-			invocationHandler(w, "DELETE", isocode)
+		// // Trigger event if deleted configuration has a registered webhook to invoke
+		if !invocationHandler(w, "DELETE", isocode) {
+			return
 		}
 
 	} else {
@@ -344,26 +341,31 @@ func deleteDashboard(w http.ResponseWriter, r *http.Request) {
 }
 
 // Function that updates a dashboard. Works as both PUT and PATCH, depending on bool given
-func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
+func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) {
 
 	//Fetching ID from URL
 	myId := r.URL.Path[len(utils.REGISTRATION_PATH):]
-
-	//Creates the object variable, with data stored from the user input
-	var myObject utils.Firestore
-	if err := json.NewDecoder(r.Body).Decode(&myObject); err != nil {
-		return err
-	}
-
-	//Time is set to now
-	myObject.LastChange = time.Now()
 
 	documentExists := true
 
 	doc, err := GetDocumentByID(ctx, collection, myId)
 	if err != nil {
+		// Document not found
+		errorMessage := "Document with ID " + myId + "not found"
+		http.Error(w, errorMessage, http.StatusNotFound)
 		documentExists = false
+		return
 	}
+
+	//Creates the object variable, with data stored from the user input
+	var myObject utils.Firestore
+	if err := json.NewDecoder(r.Body).Decode(&myObject); err != nil {
+		http.Error(w, "Error: decoding JSON, Invalid input \n"+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	//Time is set to now
+	myObject.LastChange = time.Now()
 
 	var docRef interface{} = nil
 
@@ -383,7 +385,7 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 		validCountry, validIso, err := utils.CheckCountry(myObject.Country, myObject.IsoCode, w)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return err
+			return
 		}
 
 		myObject.Country = validCountry
@@ -393,7 +395,7 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 		_, checkIfMissingElements, missingElements := utils.UpdatedData(&p, &myObject, w)
 		if checkIfMissingElements {
 			http.Error(w, "Missing variables: "+strings.Join(missingElements, ", "), http.StatusBadRequest)
-			return nil
+			return
 		}
 
 		myObject.Features.TargetCurrencies = utils.CheckCurrencies(myObject.Features.TargetCurrencies, w)
@@ -424,7 +426,7 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 				if err != nil {
 					if status.Code(err) == codes.NotFound {
 						http.Error(w, "Document does not exist, cannot PATCH", http.StatusBadRequest)
-						return nil
+						return
 					}
 				}
 				doc.DataTo(&newObject)
@@ -434,7 +436,7 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 				_, err1 := firestoreDocRef.Set(ctx, data)
 				if err1 != nil {
 					http.Error(w, "failed to update data", http.StatusInternalServerError)
-					return nil
+					return
 
 				}
 			}
@@ -466,16 +468,14 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 			_, _, err := client.Collection(collection).Add(ctx, data)
 			if err != nil {
 				http.Error(w, "Failed to add new document: "+err.Error(), http.StatusInternalServerError)
-				return nil
+				return
 			}
 
 		}
 
 		// Trigger event if changed configuration has a registered webhook to invoke
-		if !checkWebhook(isocode) {
-			log.Println("No CHANGE event triggered...")
-		} else {
-			invocationHandler(w, "CHANGE", isocode)
+		if !invocationHandler(w, "CHANGE", isocode) {
+			return
 		}
 
 		//If user put in a PATCH request
@@ -491,7 +491,7 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 				if err != nil {
 					if status.Code(err) == codes.NotFound {
 						http.Error(w, "Document does not exist, cannot PATCH", http.StatusBadRequest)
-						return nil
+						return
 					}
 				}
 				doc.DataTo(&newObject)
@@ -527,22 +527,17 @@ func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) error {
 				})
 				if err != nil {
 					http.Error(w, "Failed to patch", http.StatusInternalServerError)
-					return err
+					return
 				}
 			}
 		} else {
 			http.Error(w, "Document does not exist", http.StatusBadRequest)
-			return nil
+			return
 		}
 
 		// Trigger event if changed configuration has a registered webhook to invoke
-		if !checkWebhook(isocode) {
-			log.Println("No CHANGE event triggered...")
-		} else {
-			invocationHandler(w, "CHANGE", isocode)
+		if !invocationHandler(w, "CHANGE", isocode) {
+			return
 		}
-
 	}
-
-	return nil
 }

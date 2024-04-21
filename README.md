@@ -462,6 +462,6 @@ There are test for functions that do not directly access firestore, or parts of 
 
 The service is to be deployed on an IaaS solution OpenStack using Docker. 
 
-URL to deployed service on SkyHigh: <url....>
+URL to deployed service on SkyHigh: http://10.212.169.134:8080/ (requires VPN)
 
 To run this code yourself, you need to connect it to your own firestore, by making databases there (named Dashboard and webhooks), and put your firestore key in the same folder as main.go
