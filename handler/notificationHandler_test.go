@@ -13,11 +13,11 @@ import (
 // Test function for ValidateEvent function
 func TestValidEvent(t *testing.T) {
 	// Test valid event
-	if !ValidateEvent("REGISTER") || !ValidateEvent("INVOKE") || !ValidateEvent("CHANGE") || !ValidateEvent("DELETE") {
+	if !utils.ValidateEvent("REGISTER") || !utils.ValidateEvent("INVOKE") || !utils.ValidateEvent("CHANGE") || !utils.ValidateEvent("DELETE") {
 		t.Errorf("Expected true, got false")
 	}
 	// Test invalid event
-	if ValidateEvent("INVALID") {
+	if utils.ValidateEvent("INVALID") {
 		t.Errorf("Expected false, got true")
 
 	}
@@ -157,7 +157,7 @@ func TestIsDigit(t *testing.T) {
 	}
 	// Loop through the test struct and check validity
 	for _, test := range tests {
-		got := isDigit(test.input)
+		got := utils.IsDigit(test.input)
 		if got != test.want {
 			t.Errorf("isDigit(%v) = %v; want %v", test.input, got, test.want)
 		}

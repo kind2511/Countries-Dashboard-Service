@@ -68,20 +68,14 @@ func deleteWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func ValidateEvent(e string) bool {
-	return e == "REGISTER" || e == "INVOKE" || e == "CHANGE" || e == "DELETE"
-}
-
-func isDigit(c byte) bool {
-	return c >= '0' && c <= '9'
-}
-
+// POST requests being handled with this function
 func postWebhook(w http.ResponseWriter, r *http.Request) {
 
 	decoder := json.NewDecoder(r.Body)
 
 	decoder.DisallowUnknownFields()
 
+	//Creating a struct variable, and assigning values to this struct with data provided by user
 	var hook utils.WebhookRegistration
 	err := decoder.Decode(&hook)
 	if err != nil {
@@ -89,61 +83,73 @@ func postWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//If url or event is empty, error is returned
 	if utils.IsEmptyField(hook.Url) || utils.IsEmptyField(hook.Event) {
-		http.Error(w, "Not all needed elements are included", http.StatusBadRequest)
+		http.Error(w, "Url or Event is not included", http.StatusBadRequest)
 		return
 	}
 
-	if !ValidateEvent(hook.Event) {
+	//if event is not REGISTER, CHANGE, INVOKE or DELETE, returns error
+	if !utils.ValidateEvent(hook.Event) {
 		http.Error(w, "Event is not added in correctly", http.StatusBadRequest)
 		return
 	}
 
+	/*
+		Here is where it checks the url.
+		Checks for either localhost urls or regular urls
+		For localhost urls, it checks if it contains the string http://localhost:XXXX/
+		at the start, where XXXX needs to be digits, and not other characters
+	*/
 	if strings.HasPrefix(hook.Url, "http://localhost:") {
+		//Checks if the substring contains at least 5 characters
 		substring := hook.Url[len("http://localhost:"):]
 		if len(substring) < 5 {
 			http.Error(w, "Localhost url is not valid", http.StatusBadRequest)
 			return
 
+			//If the fifth character in the substring is not '/', it returns error
 		} else if substring[4] != '/' {
 			http.Error(w, "Localhost url is not valid", http.StatusBadRequest)
 			return
 		}
 
+		//Bool to see if url is valid
 		valid := true
+		//Runs through the four characters, to see if the port contains only digits
+		//Returns false if 1 of them does not contain a digit
 		for i := 0; i < 4; i++ {
-			if i >= len(substring) || !isDigit(substring[i]) {
+			if i >= len(substring) || !utils.IsDigit(substring[i]) {
 				valid = false
 				break
 			}
 		}
 
+		//If not valid
 		if !valid {
 			http.Error(w, "Localhost url is not valid", http.StatusBadRequest)
 			return
 		}
-
 	}
 
+	//If it is a regular url, it does a HEAD request,
+	//and if it returns status code other than 200, error is returned
 	check, _ := http.Head(hook.Url)
 	if check.StatusCode != http.StatusOK {
 		http.Error(w, "Url provided is not valid", http.StatusBadRequest)
 		return
-	}
 
-	a, err := http.Get(structs.COUNTRIES_API_ISOCODE + hook.Country)
-	if err != nil {
-		http.Error(w, "Failed to check for country data", http.StatusBadRequest)
-		return
 	}
-	// Have it so that you can register a webhook with empty country field
-	if a.StatusCode == http.StatusBadRequest && hook.Country != "" {
-		http.Error(w, "isocode: "+hook.Country+" is not valid", http.StatusBadRequest)
-		return
+	//Checks if country is valid
+	a, _ := http.Get(structs.COUNTRIES_API_ISOCODE + hook.Country)
+	// If country is not valid, country is set to blank (works also if country is not written in)
+	if a.StatusCode != http.StatusOK {
+		hook.Country = ""
 	}
 
 	a.Body.Close()
 
+	//Unique id for webhook
 	var uniqueID string
 
 	for {
@@ -168,8 +174,10 @@ func postWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	//Capitalizes isocode
 	isocode := strings.ToUpper(hook.Country)
 
+	//Adds document to webhook collection in firestore with data
 	_, _, err1 := client.Collection(webhookCollection).Add(ctx,
 		map[string]interface{}{
 			"id":      uniqueID,
@@ -180,6 +188,7 @@ func postWebhook(w http.ResponseWriter, r *http.Request) {
 	if err1 != nil {
 		return
 	} else {
+		//Response to user with id that is given to webhook
 		response := struct {
 			ID string `json:"id"`
 		}{
@@ -323,7 +332,7 @@ func callUrl(w http.ResponseWriter, hook utils.WebhookInvokeMessage) {
 	event := hook.Event
 	country := hook.Country
 
-	log.Println("Attempting invocation of URL " + url + " for Country:'" +
+	log.Println("Attempting invocation of URL " + url + " by Country:'" +
 		country + "' and Event:'" + event)
 
 	// Set current time
