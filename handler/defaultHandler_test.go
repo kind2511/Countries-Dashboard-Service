@@ -1,12 +1,29 @@
 package handler
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 )
+
+// Mock response writer for error case
+type errorResponseWriter struct{}
+
+// Implement the ResponseWriter interface
+func (erw *errorResponseWriter) Header() http.Header {
+	return http.Header{}
+}
+
+// Implement the ResponseWriter interface
+func (erw *errorResponseWriter) Write([]byte) (int, error) {
+	return 0, errors.New("mock error")
+}
+
+// Implement the ResponseWriter interface header
+func (erw *errorResponseWriter) WriteHeader(int) {}
 
 // Test for default handler
 func TestDefaultHandler(t *testing.T) {
@@ -30,4 +47,9 @@ func TestDefaultHandler(t *testing.T) {
 	if !strings.Contains(string(body), "This service has the following endpoints with methods:") {
 		t.Errorf("expected response body to contain 'This service has the following endpoints with methods:', got %v", string(body))
 	}
+
+	// Test the error case
+	erw := &errorResponseWriter{}
+	DefaultHandler(erw, r)
+
 }
