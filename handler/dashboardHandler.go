@@ -321,24 +321,31 @@ func retrieveWeather(urlAPI string, longitude myFloat, latitude myFloat, w http.
 	return avgTemp, avgPrecipitation, nil
 }
 
+// Function that retrieves currency rates for said currency, returns a map that contains the currency rates
 func retrieveCurrencyExchangeRates(apiURL, currency string, w http.ResponseWriter, r *http.Request) (map[string]myFloat, error) {
+	//Making a new map that will contain the currency rates
 	currencyData := make(map[string]myFloat)
 
+	//Struct that contains a map with all currency rates to a certain currency
 	var Currencies struct {
 		Currency map[string]myFloat `json:"rates"`
 	}
 
+	//Fetching url data from currency Api with said currency and putting the data into the struct
 	err := utils.FetchURLdata(apiURL+currency, w, &Currencies)
 	if err != nil {
 		return nil, err
 	}
+	//putting the rates data into the map
 	for currencyName, currencyValue := range Currencies.Currency {
 		currencyData[currencyName] = currencyValue
 	}
 
+	//Returning the map
 	return currencyData, nil
 }
 
+// Function that changes float numbers to having two decimals, making it presentable in the output
 func floatFormat(number myFloat) (myFloat, error) {
 	stringFloat := strconv.FormatFloat(float64(number), 'f', 2, 64)
 	newFloat, err := strconv.ParseFloat(stringFloat, 64)
