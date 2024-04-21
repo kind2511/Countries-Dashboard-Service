@@ -1,13 +1,15 @@
 package utils
 
 import (
+	"errors"
 	"net/http/httptest"
 	"testing"
 	"time"
 )
 
+// Test for CheckCurrencies function
 func TestCheckCurrencies(t *testing.T) {
-	// Create a ResponseRecorder (which satisfies http.ResponseWriter) to record the response.
+	// Create a ResponseRecorder to record the response.
 	rr := httptest.NewRecorder()
 
 	// Test data
@@ -22,6 +24,7 @@ func TestCheckCurrencies(t *testing.T) {
 		t.Errorf("checkCurrencies() returned %v, want %v", result, expected)
 	}
 
+	// Check that the result is correct
 	for i, v := range result {
 		if v != expected[i] {
 			t.Errorf("checkCurrencies() returned %v, want %v", result, expected)
@@ -82,7 +85,7 @@ func BoolPtr(b bool) *bool {
 func TestUpdatedData(t *testing.T) {
 	// Make an empty object
 	emptyObject := &Firestore{}
-	// FIll the object with data
+	// FIll the object with data and bool pointer values to satisfy the struct
 	filledObject := &Firestore{
 		Country: "Norway",
 		IsoCode: "NO",
@@ -126,43 +129,111 @@ func TestUpdatedData(t *testing.T) {
 
 	// Call the function
 	updatedObject, missing, missingElements = UpdatedData(emptyObject, emptyFilledObject, w)
-	// Check that the fields are updated correctly (bools will be false, but not empty)
+	// Check that the fields are updated correctly with more missing elements
 	if !missing || len(missingElements) != 9 {
 		t.Errorf("Did not identify missing objects correctly %v", missingElements)
 	}
 }
 
-/*
-// Test function CheckCountry
-func TestCheckCountry(t *testing.T) {
-	// Create a mock HTTP server and close when finished testing
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Write a mock response
-		if r.URL.Path == "/name/Norway" || r.URL.Path == "/iso/NO" {
-			w.Write([]byte(`[{"name": {"common": "Norway"}, "cca2": "NO"}]`))
-		} else {
-			http.Error(w, "Not Found", http.StatusNotFound)
-		}
-	}))
-	defer server.Close()
-
-	// Set the COUNTRIES_API_NAME and COUNTRIES_API_ISOCODE to the mock server's URL
-	COUNTRIES_API_NAME = server.URL + "/name/"
-	COUNTRIES_API_ISOCODE = server.URL + "/iso/"
-
-	// Create a mock http.ResponseWriter
-	w := httptest.NewRecorder()
-
-	// Test with valid country name and ISO code
-	name, iso, err := CheckCountry("Norway", "NO", w)
-	if name != "Norway" || iso != "NO" || err != nil {
-		t.Errorf("CheckCountry() returned %v, %v, %v; want Norway, NO, nil", name, iso, err)
+// Test for ValidateEvent function
+func TestValidateEvent(t *testing.T) {
+	// Create struc to contain name, argument and expected result
+	tests := []struct {
+		name string
+		arg  string
+		want bool
+	}{
+		// Test cases with valid and invalid events
+		{"Valid event REGISTER", "REGISTER", true},
+		{"Valid event INVOKE", "INVOKE", true},
+		{"Valid event CHANGE", "CHANGE", true},
+		{"Valid event DELETE", "DELETE", true},
+		{"Invalid event", "INVALID", false},
 	}
 
-	// Test with invalid country name and ISO code
-	name, iso, err = CheckCountry("InvalidCountry", "InvalidISO", w)
-	if name != "" || iso != "" || !errors.Is(err, errors.New("no valid countries")) {
-		t.Errorf("CheckCountry() returned %v, %v, %v; want '', '', 'no valid countries'", name, iso, err)
+	// Loop through test cases
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ValidateEvent(tt.arg); got != tt.want {
+				t.Errorf("ValidateEvent() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
-*/
+
+// Test for IsDigit function
+func TestIsDigit(t *testing.T) {
+	// Create struct with name, argument and expected result
+	tests := []struct {
+		name string
+		arg  byte
+		want bool
+	}{
+		// Test cases with valid and invalid "digits"
+		{"Digit 0", '0', true},
+		{"Digit 1", '1', true},
+		{"Letter a", 'a', false},
+		{"Letter A", 'A', false},
+	}
+
+	// Loop through test cases
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsDigit(tt.arg); got != tt.want {
+				t.Errorf("IsDigit() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// Test for checkCountry function
+func TestCheckCountry(t *testing.T) {
+	// Create struct with name, country name, ISO code, expected name, expected ISO code and expected error
+	tests := []struct {
+		name        string
+		countryName string
+		isoCode     string
+		wantName    string
+		wantIso     string
+		wantErr     error
+	}{
+		// Test cases with valid and invalid country names and ISO codes
+		{
+			"Valid country name",
+			"USA",
+			"",
+			"United States",
+			"US",
+			nil,
+		},
+		{
+			"Valid ISO code",
+			"",
+			"US",
+			"United States",
+			"US",
+			nil,
+		},
+		{
+			"No valid countries",
+			"",
+			"",
+			"",
+			"",
+			errors.New("no valid countries"),
+		},
+	}
+
+	// Loop through test cases
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a ResponseRecorder to record the response
+			rr := httptest.NewRecorder()
+			// Call the function
+			gotName, gotIso, gotErr := CheckCountry(tt.countryName, tt.isoCode, rr)
+			if gotName != tt.wantName || gotIso != tt.wantIso || (gotErr != nil && gotErr.Error() != tt.wantErr.Error()) {
+				t.Errorf("CheckCountry() = %v, %v, %v, want %v, %v, %v", gotName, gotIso, gotErr, tt.wantName, tt.wantIso, tt.wantErr)
+			}
+		})
+	}
+}
