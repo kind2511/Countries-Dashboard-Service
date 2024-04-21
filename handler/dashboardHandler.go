@@ -190,7 +190,6 @@ func DashboardFunc(w http.ResponseWriter, r *http.Request) error {
 
 		http.Error(w, "Needs an Id after endpoint to be used", http.StatusBadRequest)
 		return nil
-
 	}
 
 	return nil
