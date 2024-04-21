@@ -1,0 +1,7 @@
+services:
+  app:
+    build: .
+    volumes:
+      - .secrets:/go/src/app/.secrets:ro 
+    ports:
+      - '8080:8080'
