@@ -215,3 +215,18 @@ func TestDashboardsHandler(t *testing.T) {
 		t.Fatal("Unsupported method has wrong status code", res.StatusCode)
 	}
 }
+
+// Test function for DashboardFunc
+func TestDashboardFunc(t *testing.T) {
+	// Test when myID is empty
+	req, _ := http.NewRequest("GET", "/dashboard/v1/dashboards/", nil)
+	// Create a ResponseRecorder to record the response.
+	w := httptest.NewRecorder()
+	// Call the function
+	DashboardFunc(w, req)
+	// Check the result
+	if w.Result().StatusCode != http.StatusBadRequest {
+		t.Errorf("dashboard() returned wrong status code for empty myID: got %v want %v", w.Result().StatusCode, http.StatusBadRequest)
+	}
+
+}
