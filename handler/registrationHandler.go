@@ -306,16 +306,9 @@ func deleteDashboard(w http.ResponseWriter, r *http.Request) {
 	if len(dashboardID) != 0 {
 		doc, err := GetDocumentByID(ctx, collection, dashboardID)
 		if err != nil {
-			//if err == iterator.Done {
-			if status.Code(err) == codes.NotFound {
-				// Document not found
-				errorMessage := "Document with ID " + dashboardID + " not found"
-				http.Error(w, errorMessage, http.StatusNotFound)
-				return
-			}
-			// If trouble retrieving document
-			log.Println("Error retrieving document:", err)
-			http.Error(w, "Error retrieving document", http.StatusInternalServerError)
+			// Document not found
+			errorMessage := "Document with ID " + dashboardID + " not found"
+			http.Error(w, errorMessage, http.StatusNotFound)
 			return
 		}
 
