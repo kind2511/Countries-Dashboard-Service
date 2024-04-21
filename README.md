@@ -455,7 +455,7 @@ Body:
 ## Test 
 To run the tests run command in root folder:  go test -v ./.... Here you will see what tests are run, and if they pass or fail. 
 
-In Visual Studio code you can also go to test files and press run package tests at the top of the folder to run all implemented tests and see the % of total coverage of test for the whole program. 
+There are test for functions that do not directly access firestore, or parts of functions that do not access firestore. With mocking of firestore, it is possible to make the % of tests much higher, but due to time and problems mocking firestore (and to our understanding, it is not in our curriculum to be able to mock firestore) these are not tested. 
 
 
 ## Deployment
@@ -463,3 +463,5 @@ In Visual Studio code you can also go to test files and press run package tests 
 The service is to be deployed on an IaaS solution OpenStack using Docker. 
 
 URL to deployed service on SkyHigh: <url....>
+
+To run this code yourself, you need to connect it to your own firestore, by making databases there (named Dashboard and webhooks), and put your firestore key in the same folder as main.go
