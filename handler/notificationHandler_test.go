@@ -4,8 +4,10 @@ import (
 	"assignment2/utils"
 	"bytes"
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 )
@@ -140,6 +142,19 @@ func TestGetWebHooks(t *testing.T) {
 	if strings.TrimSpace(w.Body.String()) != strings.TrimSpace(expected) {
 		t.Errorf("handler returned wrong body: got %v want %v", strings.TrimSpace(w.Body.String()), strings.TrimSpace(expected))
 	}
+
+	req, err := http.NewRequest("GET", "/webhook/", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest() returned error: %v", err)
+	}
+
+	rr := httptest.NewRecorder()
+	getWebHooks(rr, req)
+
+	// The expected status code is 400 Bad Request
+	if status := rr.Code; status != http.StatusInternalServerError {
+		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusInternalServerError)
+	}
 }
 
 // Test function for IsDigit function
@@ -263,5 +278,109 @@ func TestPostWebhook(t *testing.T) {
 
 	if len(uniqueID) != 5 {
 		t.Errorf("Expected length to be 5, got %v", len(uniqueID))
+	}
+}
+
+// Test function for DeleteWebhook function
+func TestDeleteWebhook(t *testing.T) {
+	// Test without webhook ID in the URL
+	req, err := http.NewRequest("DELETE", "/dashboard/v1/webhook/", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest() returned error: %v", err)
+	}
+	// Create a ResponseRecorder to record the response
+	rr := httptest.NewRecorder()
+	deleteWebhook(rr, req)
+
+	// Test the expected error output
+	if status := rr.Code; status != http.StatusBadRequest {
+		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusBadRequest)
+	}
+}
+
+// Test function for InvocationHandler function
+func TestInvocationHandler(t *testing.T) {
+	// Create a resopnse recorder
+	rr := httptest.NewRecorder()
+
+	// Check that the handler returns the correct status code
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+
+	// Test with invalid event type
+	_, err := http.NewRequest("POST", "/invoke", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequest() returned error: %v", err)
+	}
+	// Update the recorder to test the invalid event type
+	rr = httptest.NewRecorder()
+	invocationHandler(rr, "INVALID", "NO")
+
+	// Check that the handler returns the correct status code
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+}
+
+// Test function for callURL function
+func TestCallURL(t *testing.T) {
+	// Start an HTTP test server and close it when the test is done
+	test := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "Hello, World")
+	}))
+	defer test.Close()
+
+	// Test callURL
+	hook := utils.WebhookInvokeMessage{
+		Url:     test.URL,
+		Event:   "TestEvent",
+		Country: "TestCountry",
+	}
+	// Create a ResponseRecorder to record the response and call the function
+	rr := httptest.NewRecorder()
+	callUrl(rr, hook)
+
+	// Check that it returns the correct status code
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+	// set up buffer to capture log output, and reset when done
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	defer func() {
+		log.SetOutput(os.Stderr)
+	}()
+	// Test with invalid URL
+	hook = utils.WebhookInvokeMessage{
+		Url:     "http://invalid-url",
+		Event:   "TestEvent",
+		Country: "TestCountry",
+	}
+	// Update response recorder and call the function
+	rr = httptest.NewRecorder()
+	callUrl(rr, hook)
+
+	// Check the log output
+	if !strings.Contains(buf.String(), "Error in HTTP request") {
+		t.Errorf("handler did not log correct message: got %v want %v", buf.String(), "Error in HTTP request")
+	}
+
+	// Clear the log output
+	buf.Reset()
+
+	// Test with invalid JSON payload
+	hook = utils.WebhookInvokeMessage{
+		Url:     "http://valid-url",
+		Event:   string([]byte{0x80, 0x81, 0x82, 0x83}), // Invalid 0x80-0x83
+		Country: "TestCountry",
+	}
+	// Update response recorder and call the function
+	rr = httptest.NewRecorder()
+	callUrl(rr, hook)
+
+	// Check the log output is as expected
+	if !strings.Contains(buf.String(), "Error in HTTP request") {
+		t.Errorf("handler did not log correct message: got %v want %v", buf.String(), "Error in HTTP request")
 	}
 }
