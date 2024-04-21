@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -72,7 +73,7 @@ func TestSetFirestoreClient(t *testing.T) {
 
 // Test for postRegistration function
 func TestPostRegistration(t *testing.T) {
-	// Create a Firestore object
+	// Create a Firestore object with all fields filled
 	dashboard := utils.Firestore{
 		ID:      "testID",
 		Country: "testCountry",
@@ -135,6 +136,35 @@ func TestPostRegistration(t *testing.T) {
 	// Check the result
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf("postRegistration() returned status code %v; want %v", rr.Code, http.StatusBadRequest)
+	}
+
+	// Create a new body with missing variables
+	body := `{
+			"country": "Norway",
+			"isoCode": "NO"
+		}`
+	// Create a new request with the body that is missing variables
+	req2, err2 := http.NewRequest("POST", "/register", bytes.NewBufferString(body))
+	if err2 != nil {
+		t.Fatalf("http.NewRequest() returned error: %v", err)
+	}
+	// call the function with the new request
+	postRegistration(rr, req2)
+
+	// Check the response
+	response := rr.Result()
+	if response.StatusCode != http.StatusBadRequest {
+		t.Errorf("postRegistration() returned wrong status code: got %v want %v", response.StatusCode, http.StatusBadRequest)
+	}
+
+	// Check the response body
+	bodyBytes, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatalf("Returned error: %v", err)
+	}
+	// Check if the body contains the correct message
+	if !strings.Contains(string(bodyBytes), "Missing variables:") {
+		t.Errorf("postRegistration returned wrong body: got %v want %v", string(bodyBytes), "Missing :")
 	}
 }
 
