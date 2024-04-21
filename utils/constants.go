@@ -14,7 +14,8 @@ const CURRENCY_API = "http://129.241.150.113:9090/currency/"
 
 const DEFAULT_PATH = "/dashboard/v1/"
 
-const REGISTRATION_PATH = DEFAULT_PATH + "registrations/"
+const REGISTRATION_PATH = DEFAULT_PATH + "registrations"
+const REGISTRATION_LINE_PATH = DEFAULT_PATH + "registrations/"
 
 const DASHBOARD_PATH = DEFAULT_PATH + "dashboards/"
 

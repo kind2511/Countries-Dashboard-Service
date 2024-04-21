@@ -172,7 +172,6 @@ func postRegistration(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Trigger event if registered configuration has a registered webhook to invoke
-		// Trigger event if changed configuration has a registered webhook to invoke
 		if !invocationHandler(w, "REGISTER", dashboard.IsoCode) {
 			return
 		}
@@ -249,9 +248,15 @@ func retrieveDocumentData(w http.ResponseWriter, doc *firestore.DocumentSnapshot
 
 // Gets one dashboard based on its Firestore ID. If no ID is provided it gets all dashboards
 func getDashboards(w http.ResponseWriter, r *http.Request) {
+
 	// Extract dashboard ID from URL
 	elem := strings.Split(r.URL.Path, "/")
-	dashboardID := elem[4]
+
+	var dashboardID string
+	if len(elem) >= 5 {
+		dashboardID = elem[4]
+	}
+	//dashboardID := elem[4]
 
 	if len(dashboardID) != 0 {
 		doc, err := GetDocumentByID(ctx, collection, dashboardID)
@@ -344,7 +349,7 @@ func deleteDashboard(w http.ResponseWriter, r *http.Request) {
 func updateDashboard(w http.ResponseWriter, r *http.Request, isPut bool) {
 
 	//Fetching ID from URL
-	myId := r.URL.Path[len(utils.REGISTRATION_PATH):]
+	myId := r.URL.Path[len(utils.REGISTRATION_LINE_PATH):]
 
 	documentExists := true
 
