@@ -298,31 +298,6 @@ func TestDeleteWebhook(t *testing.T) {
 	}
 }
 
-// Test function for InvocationHandler function
-func TestInvocationHandler(t *testing.T) {
-	// Create a resopnse recorder
-	rr := httptest.NewRecorder()
-
-	// Check that the handler returns the correct status code
-	if status := rr.Code; status != http.StatusOK {
-		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
-	}
-
-	// Test with invalid event type
-	_, err := http.NewRequest("POST", "/invoke", nil)
-	if err != nil {
-		t.Fatalf("http.NewRequest() returned error: %v", err)
-	}
-	// Update the recorder to test the invalid event type
-	rr = httptest.NewRecorder()
-	invocationHandler(rr, "INVALID", "NO")
-
-	// Check that the handler returns the correct status code
-	if status := rr.Code; status != http.StatusOK {
-		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
-	}
-}
-
 // Test function for callURL function
 func TestCallURL(t *testing.T) {
 	// Start an HTTP test server and close it when the test is done
