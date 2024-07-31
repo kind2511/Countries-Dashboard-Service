@@ -15,7 +15,9 @@ The external services used:
   * Endpoint: http://129.241.150.113:9090/currency/
   * Documentation: http://129.241.150.113:9090/
 
-This project uses firebase as its database. This application requires that the user first goes to firestore and creates a private key for firebase. Once this step is completed change the name of the key to firestore_key.json. This key needs to be put in the root folder of the project. 
+## How to run
+* This project uses firebase as its database. This application requires that the user first goes to firestore and creates a private key for firebase. Once this step is completed, change the name of the key to firestore_key.json. This key needs to be put in the root folder of the project.
+* Then to run the project from the root of the project use "go run main.go".
 
 ## Endpoints
 
