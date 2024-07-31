@@ -1,9 +1,0 @@
-services:
-  app:
-    build: .
-    environment:
-      - FIREBASE_CREDENTIALS=${FBASE_KEY}
-    volumes:
-      - .secrets:/go/src/app/.secrets:ro 
-    ports:
-      - '8080:8080'
