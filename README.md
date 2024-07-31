@@ -15,7 +15,7 @@ The external services used:
   * Endpoint: http://129.241.150.113:9090/currency/
   * Documentation: http://129.241.150.113:9090/
 
-The final web service is deployed in our local OpenStack instance SkyHigh. 
+This project uses firebase as its database. This application requires that the user first goes to firestore and creates a private key for firebase. Once this step is completed change the name of the key to firestore_key.json. This key needs to be put in the root folder of the project. 
 
 ## Endpoints
 
